@@ -11,22 +11,15 @@ __version__ = get_versions()['version']
 del get_versions
 
 
-class DarkFrameCache(Device):
+class SnapshotDevice(Device):
     """
-    A mock Device that stashes a dark frame and returns it when read.
+    A mock Device that stashes a snapshot of another Device for later reading
 
     Parameters
     ----------
-    *args
-        Passed through to base class, ophyd.Device
-    **kwargs
-        Passed through to base class, ophyd.Device
+    device: Device
     """
-    def __init__(self, *args, **kwargs):
-        # self.det = det
-        self.last_collected = None
-        self.just_started = True
-        self._assets_collected = True
+    def __init__(self, device):
         self._describe = None
         self._describe_configuration = None
         self._read = None
@@ -34,7 +27,21 @@ class DarkFrameCache(Device):
         self._read_attrs = None
         self._configuration_attrs = None
         self._asset_docs_cache = None
-        return super().__init__(*args, **kwargs)
+        self._assets_collected = False
+        return super().__init__(name=device.name, parent=device.parent)
+
+    def __repr__(self):
+        return f"<SnapshotDevice of {self.name} at {self.snapshot_capture_time}>"
+
+    def capture(self, device):
+        self._describe = device.describe()
+        self._describe_configuration = device.describe_configuration()
+        self._read = device.read()
+        self._read_configuration = device.read_configuration()
+        self._read_attrs = list(device.read())
+        self._configuration_attrs = list(device.read_configuration())
+        self._asset_docs_cache = list(device.collect_asset_docs())
+        self.snapshot_capture_time = time.time()
 
     def read(self):
         return self._read
@@ -65,15 +72,13 @@ class DarkFrameCache(Device):
     def stage(self):
         self._assets_collected = False
 
-    def capture(self, camera):
-        self._describe = camera.describe()
-        self._describe_configuration = camera.describe_configuration()
-        self._read = camera.read()
-        self._read_configuration = camera.read_configuration()
-        self._read_attrs = list(camera.read())
-        self._configuration_attrs = list(camera.read_configuration())
-        self._asset_docs_cache = list(camera.collect_asset_docs())
-        self.last_collected = time.monotonic()
+
+class SnapshotShell:
+    def __init__(self):
+        self.snapshot = None
+
+    def __getattr__(self, key):
+        return getattr(self.snapshot, key)
 
 
 class InsertReferenceToDarkFrame:
@@ -82,27 +87,30 @@ class InsertReferenceToDarkFrame:
 
     Parameters
     ----------
-    dark_frame_cache: DarkFrameCache
-        A mock Device that caches a dark frame and returns it when read.
+    get_snapshot : callable
+        Expected signature: ``f() -> SnapshotDevice``
     stream_name: string, optional
         Default is ``'dark'``
     """
-    def __init__(self, dark_frame_cache, stream_name='dark'):
-        self.dark_frame_cache = dark_frame_cache
+    def __init__(self, get_snapshot, stream_name='dark'):
+        self.get_snapshot = get_snapshot
         self.stream_name = stream_name
 
     def __call__(self, plan):
+        print("I am Insert")
 
         def insert_reference_to_dark_frame(msg):
+            print('insert_reference_to_dark_frame is processing', msg)
             if msg.command == 'open_run':
+                snapshot = self.get_snapshot()
                 return (
                     bluesky.preprocessors.pchain(
                         bluesky.preprocessors.single_gen(msg),
-                        bps.stage(self.dark_frame_cache),
-                        bps.trigger_and_read([self.dark_frame_cache], name='dark'),
-                        bps.unstage(self.dark_frame_cache)
+                        bps.stage(snapshot),
+                        bps.trigger_and_read([snapshot], name='dark'),
+                        bps.unstage(snapshot)
                     ),
-                    None,
+                    None
                 )
             else:
                 return None, None
@@ -114,27 +122,64 @@ class InsertReferenceToDarkFrame:
 class TakeDarkFrames:
     """
     A plan preprocessor that inserts instructions to take a fresh dark frame.
+
+    Parameters
+    ----------
+    dark_plan : callable
+        Expected siganture: ``dark_plan() -> snapshot_device``
+    max_age : float
+        Time after which a fresh dark frame should be acquired
+    locked_signals : Iterable
+        Any changes to these signals invalidate the current dark frame and
+        prompt us to take a new one.
     """
-    def __init__(self, *, dark_frame_cache, max_age, dark_plan):
-        self.dark_frame_cache = dark_frame_cache
-        self.max_age = max_age
+    def __init__(self, *, dark_plan, max_age, locked_signals=None):
         self.dark_plan = dark_plan
+        self.max_age = max_age
+        self.locked_signals = tuple(locked_signals or ())
+        self._current_snapshot = SnapshotShell()
+        self._locked_signals_state = ()
+
+    def new_snapshot_needed(self):
+        print('new_snapshot_needed is running')
+        if self._current_snapshot.snapshot is None:
+            # No snapshot yet. Must take one.
+            return True
+        if self.max_age > time.time() - self._current_snapshot.snapshot_capture_time:
+            # Snapshot is too old.
+            return True
+
+        # Check whether any of the signals have changed since the last
+        # snapshot.
+        self._locked_signals_state
+        current_state = []
+        for signal in self.locked_signals:
+            current_state.append(signal.read())
+        current_state = tuple(current_state)
+        if current_state != self._locked_signals_state:
+            self._locked_signals_state = current_state
+            return False
+        else:
+            return True
+
+    def get_snapshot(self):
+        return self._current_snapshot
 
     def __call__(self, plan):
+        print("I am Take")
+
+        def tail():
+            print("TAIL TAIL TAIL TAIL TAIL")
+            self._current_snapshot.snapshot = yield from self.dark_plan()
+            print('Got new snapshot', self._current_snapshot)
 
         def insert_take_dark(msg):
-            if (msg.command == 'open_run' and
-                    (self.dark_frame_cache.last_collected is None or
-                     self.max_age <
-                     time.monotonic() - self.dark_frame_cache.last_collected)):
-                return (
-                    bluesky.preprocessors.pchain(
-                        self.dark_plan(),
-                        bluesky.preprocessors.single_gen(msg),
-                    ),
-                    None,
-                )
+            print('insert_take_dark is processing', msg)
+            if (msg.command == 'open_run' and self.new_snapshot_needed()):
+                print('new snapshot IS needed')
+                return None, tail()
             else:
+                print('new snapshot is NOT needed')
                 return None, None
 
         return (yield from bluesky.preprocessors.plan_mutator(plan, insert_take_dark))
