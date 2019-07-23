@@ -164,17 +164,24 @@ class DarkFramePreprocessor:
 
 
 class DarkSubtraction(event_model.DocumentRouter):
-    def __init__(self, *args, **kwargs):
+    def __init__(self,
+                 field,
+                 light_stream_name='primary',
+                 dark_stream_name='dark',
+                 inplace=False):
+        self.field = field
+        self.light_stream_name = light_stream_name
+        self.dark_stream_name = dark_stream_name
+        self.inplace = inplace
+        self.light_descriptor = None
         self.dark_descriptor = None
-        self.primary_descriptor = None
         self.dark_frame = None
-        super().__init__(*args, **kwargs)
 
     def descriptor(self, doc):
-        if doc['name'] == 'dark':
-            self.dark_descriptor = doc['uid']
-        elif doc['name'] == 'primary':
+        if doc['name'] == self.light_stream_name:
             self.primary_descriptor = doc['uid']
+        elif doc['name'] == self.dark_stream_name:
+            self.dark_descriptor = doc['uid']
         return super().descriptor(doc)
 
     def event_page(self, doc):
@@ -184,17 +191,21 @@ class DarkSubtraction(event_model.DocumentRouter):
         for event_doc in event_model.unpack_event_page(doc):
             filled_events.append(event(event_doc))
         new_event_page = event_model.pack_event_page(*filled_events)
-        # Modify original doc in place, as we do with 'event'.
-        doc['data'] = new_event_page['data']
-        return doc
+        if self.inplace:
+            # Modify original doc in place, as we do with 'event'.
+            doc['data'] = new_event_page['data']
+            return super().event_page(doc)
+        else:
+            return super().event_page(new_event_page)
 
     def event(self, doc):
-        FIELD = 'det_img'  # TODO Do not hard-code this.
+        if not self.inplace:
+            doc = copy.deepcopy(doc)
         if doc['descriptor'] == self.dark_descriptor:
-            self.dark_frame = doc['data']['det_img']
+            self.dark_frame = doc['data'][self.field]
         if doc['descriptor'] == self.primary_descriptor:
-            doc['data'][FIELD] = self.subtract(doc['data'][FIELD], self.dark_frame)
-        return doc
+            doc['data'][self.field] = self.subtract(doc['data'][self.field], self.dark_frame)
+        return super().event(doc)
 
     def subtract(self, light, dark):
-        return numpy.clip(light - dark, a_min=0, a_max=None).astype(numpy.uint16)
+        return numpy.clip(light - dark, a_min=0, a_max=None).astype(light.dtype)
