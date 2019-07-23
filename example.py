@@ -39,5 +39,4 @@ RE.preprocessors.append(dark_frame_preprocessor)
 RE.subscribe(rr)
 
 RE(count([det]), print)
-catalog.force_reload()
 img = catalog[-1].primary.read()['image'][0]
