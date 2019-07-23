@@ -1,6 +1,8 @@
+import logging
 import time
 
 import event_model
+from frozendict import frozendict
 import bluesky.preprocessors
 import bluesky.plan_stubs as bps
 import numpy
@@ -9,6 +11,9 @@ from ophyd import Device
 from ._version import get_versions
 __version__ = get_versions()['version']
 del get_versions
+
+
+logger = logging.getLogger('bluesky_darkframe')
 
 
 class SnapshotDevice(Device):
@@ -28,12 +33,8 @@ class SnapshotDevice(Device):
         self._configuration_attrs = None
         self._asset_docs_cache = None
         self._assets_collected = False
-        return super().__init__(name=device.name, parent=device.parent)
+        super().__init__(name=device.name, parent=device.parent)
 
-    def __repr__(self):
-        return f"<SnapshotDevice of {self.name} at {self.snapshot_capture_time}>"
-
-    def capture(self, device):
         self._describe = device.describe()
         self._describe_configuration = device.describe_configuration()
         self._read = device.read()
@@ -41,7 +42,9 @@ class SnapshotDevice(Device):
         self._read_attrs = list(device.read())
         self._configuration_attrs = list(device.read_configuration())
         self._asset_docs_cache = list(device.collect_asset_docs())
-        self.snapshot_capture_time = time.time()
+
+    def __repr__(self):
+        return f"<SnapshotDevice of {self.name}>"
 
     def read(self):
         return self._read
@@ -73,55 +76,18 @@ class SnapshotDevice(Device):
         self._assets_collected = False
 
 
-class SnapshotShell:
-    def __init__(self):
-        self.snapshot = None
-
-    def __getattr__(self, key):
-        return getattr(self.snapshot, key)
+class NoMatchingSnapshot(KeyError):
+    ...
 
 
-class InsertReferenceToDarkFrame:
+class DarkFramePreprocessor:
     """
-    A plan preprocessor that ensures one 'dark' Event is created per run.
+    A plan preprocessor that ensures each Run records a dark frame.
 
-    Parameters
-    ----------
-    get_snapshot : callable
-        Expected signature: ``f() -> SnapshotDevice``
-    stream_name: string, optional
-        Default is ``'dark'``
-    """
-    def __init__(self, get_snapshot, stream_name='dark'):
-        self.get_snapshot = get_snapshot
-        self.stream_name = stream_name
-
-    def __call__(self, plan):
-        print("I am Insert")
-
-        def insert_reference_to_dark_frame(msg):
-            print('insert_reference_to_dark_frame is processing', msg)
-            if msg.command == 'open_run':
-                snapshot = self.get_snapshot()
-                return (
-                    bluesky.preprocessors.pchain(
-                        bluesky.preprocessors.single_gen(msg),
-                        bps.stage(snapshot),
-                        bps.trigger_and_read([snapshot], name='dark'),
-                        bps.unstage(snapshot)
-                    ),
-                    None
-                )
-            else:
-                return None, None
-
-        return (yield from bluesky.preprocessors.plan_mutator(
-            plan, insert_reference_to_dark_frame))
-
-
-class TakeDarkFrames:
-    """
-    A plan preprocessor that inserts instructions to take a fresh dark frame.
+    Specifically this adds a new Event stream, named 'dark' by default. It
+    inserts one Event with a reading that contains a 'dark' frame. The same
+    reading may be used across multiple runs, depending on the rules for when a
+    dark frame is taken.
 
     Parameters
     ----------
@@ -136,53 +102,61 @@ class TakeDarkFrames:
     def __init__(self, *, dark_plan, max_age, locked_signals=None):
         self.dark_plan = dark_plan
         self.max_age = max_age
+        # The signals have to have unique names for this to work.
+        names = [signal.name for signal in locked_signals or ()]
+        if len(names) != len(set(names)):
+            raise ValueError(
+                f"The signals in locked_signals need to have unique names. "
+                f"The names given were: {names}")
         self.locked_signals = tuple(locked_signals or ())
-        self._current_snapshot = SnapshotShell()
-        self._locked_signals_state = ()
+        self._cache = {}  # map state to (creation_time, snapshot)
 
-    def new_snapshot_needed(self):
-        print('new_snapshot_needed is running')
-        if self._current_snapshot.snapshot is None:
-            # No snapshot yet. Must take one.
-            return True
-        if self.max_age > time.time() - self._current_snapshot.snapshot_capture_time:
-            # Snapshot is too old.
-            return True
+    def add_snapshot(self, snapshot, state=None):
+        logger.debug("Captured snapshot for state %r", state)
+        state = state or {}
+        self._cache[frozendict(state)] = (time.monotonic(), snapshot)
 
-        # Check whether any of the signals have changed since the last
-        # snapshot.
-        self._locked_signals_state
-        current_state = []
-        for signal in self.locked_signals:
-            current_state.append(signal.read())
-        current_state = tuple(current_state)
-        if current_state != self._locked_signals_state:
-            self._locked_signals_state = current_state
-            return False
-        else:
-            return True
-
-    def get_snapshot(self):
-        return self._current_snapshot
+    def get_snapshot(self, state):
+        # First, evict any cache entries that are too old.
+        now = time.monotonic()
+        for key, (creation_time, snapshot) in list(state.items()):
+            if now - creation_time > self.max_age:
+                logger.debug("Evicted old snapshot for state %r", state)
+                # Too old. Evict from cache.
+                del self._cache[key]
+        try:
+            creation_time, snapshot = self._cache[frozendict(state)]
+            return snapshot
+        except KeyError as err:
+            raise NoMatchingSnapshot(
+                f"No Snapshot matches the state {state}. Perhaps there *was* "
+                f"match but it has aged out of the cache.") from err
 
     def __call__(self, plan):
-        print("I am Take")
 
         def tail():
-            print("TAIL TAIL TAIL TAIL TAIL")
-            self._current_snapshot.snapshot = yield from self.dark_plan()
-            print('Got new snapshot', self._current_snapshot)
+            # Acquire a fresh Snapshot if we need one, or retrieve a cached one.
+            state = {}
+            for signal in self.locked_signals:
+                reading = yield bluesky.plan_stubs.read(signal)
+                state[signal.name] = reading
+            try:
+                snapshot = self.get_snapshot(state)
+            except NoMatchingSnapshot:
+                snapshot = yield from self.dark_plan()
+                self.add_snapshot(snapshot, state)
+            # Read the Snapshot into the 'dark' Event stream.
+            yield from bps.stage(snapshot)
+            yield from bps.trigger_and_read([snapshot], name='dark')
+            yield from bps.unstage(snapshot)
 
-        def insert_take_dark(msg):
-            print('insert_take_dark is processing', msg)
-            if (msg.command == 'open_run' and self.new_snapshot_needed()):
-                print('new snapshot IS needed')
+        def insert(msg):
+            if msg.command == 'open_run':
                 return None, tail()
             else:
-                print('new snapshot is NOT needed')
                 return None, None
 
-        return (yield from bluesky.preprocessors.plan_mutator(plan, insert_take_dark))
+        return (yield from bluesky.preprocessors.plan_mutator(plan, insert))
 
 
 class DarkSubtraction(event_model.DocumentRouter):
