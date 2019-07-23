@@ -91,11 +91,11 @@ class DarkFramePreprocessor:
 
     Parameters
     ----------
-    dark_plan : callable
+    dark_plan: callable
         Expected siganture: ``dark_plan() -> snapshot_device``
-    max_age : float
+    max_age: float
         Time after which a fresh dark frame should be acquired
-    locked_signals : Iterable
+    locked_signals: Iterable
         Any changes to these signals invalidate the current dark frame and
         prompt us to take a new one.
     """
@@ -132,7 +132,11 @@ class DarkFramePreprocessor:
                 f"No Snapshot matches the state {state}. Perhaps there *was* "
                 f"match but it has aged out of the cache.") from err
 
+    def clear(self):
+        self._cache.clear()
+
     def __call__(self, plan):
+        "Preprocessor: Takes in a plan and creates a modified plan."
 
         def tail():
             # Acquire a fresh Snapshot if we need one, or retrieve a cached one.

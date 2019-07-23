@@ -11,4 +11,5 @@ Bluesky Darkframes Documentation
 
    installation
    usage
+   reference
    release-history
