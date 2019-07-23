@@ -77,7 +77,7 @@ class DiffractionDetector(Device):
                     'root': self.save_path,
                     'resource_path': file_stem,
                     'resource_kwargs': {},
-                    'resource_uid': self._resource_uid,
+                    'uid': self._resource_uid,
                     'path_semantics': {'posix': 'posix', 'nt': 'windows'}[os.name]}
         self._asset_docs_cache.append(('resource', resource))
 
@@ -99,7 +99,8 @@ class DiffractionDetector(Device):
                                        'timestamp': time.time()}
         self._stashed_image_data_key = {'source': 'SIM:image',
                                         'shape': image.shape,
-                                        'dtype': 'array'}
+                                        'dtype': 'array',
+                                        'external': 'FILESTORE'}
         return TimerStatus(self, self.exposure_time.get())
 
     def read(self):
