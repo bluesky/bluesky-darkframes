@@ -1,3 +1,4 @@
+import collections
 import copy
 import logging
 import time
@@ -99,8 +100,11 @@ class DarkFramePreprocessor:
     locked_signals: Iterable
         Any changes to these signals invalidate the current dark frame and
         prompt us to take a new one.
+    limit: integer or None
+        Number of dark frames to cache. If None, do not limit.
     """
-    def __init__(self, *, dark_plan, max_age, locked_signals=None):
+    def __init__(self, *, dark_plan, max_age,
+                 locked_signals=None, limit=None):
         self.dark_plan = dark_plan
         self.max_age = max_age
         # The signals have to have unique names for this to work.
@@ -110,28 +114,38 @@ class DarkFramePreprocessor:
                 f"The signals in locked_signals need to have unique names. "
                 f"The names given were: {names}")
         self.locked_signals = tuple(locked_signals or ())
-        self._cache = {}  # map state to (creation_time, snapshot)
+        self._limit = limit
+        # Map state to (creation_time, snapshot).
+        self._cache = collections.OrderedDict()
 
     def add_snapshot(self, snapshot, state=None):
         logger.debug("Captured snapshot for state %r", state)
         state = state or {}
+        self._evict_old_entries()
+        if self._limit is not None and len(self._cache) > self._limit:
+            self._cache.popitem()
         self._cache[frozendict(state)] = (time.monotonic(), snapshot)
 
-    def get_snapshot(self, state):
-        # First, evict any cache entries that are too old.
+    def _evict_old_entries(self):
         now = time.monotonic()
-        for key, (creation_time, snapshot) in list(state.items()):
+        for key, (creation_time, snapshot) in list(self._cache.items()):
             if now - creation_time > self.max_age:
-                logger.debug("Evicted old snapshot for state %r", state)
+                logger.debug("Evicted old snapshot for state %r", key)
                 # Too old. Evict from cache.
                 del self._cache[key]
+
+    def get_snapshot(self, state):
+        self._evict_old_entries()
+        key = frozendict(state)
         try:
-            creation_time, snapshot = self._cache[frozendict(state)]
-            return snapshot
+            creation_time, snapshot = self._cache[key]
         except KeyError as err:
             raise NoMatchingSnapshot(
                 f"No Snapshot matches the state {state}. Perhaps there *was* "
                 f"match but it has aged out of the cache.") from err
+        else:
+            self._cache.move_to_end(key, last=False)
+            return snapshot
 
     def clear(self):
         self._cache.clear()
