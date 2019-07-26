@@ -1,10 +1,16 @@
+dist: xenial
 language: python
 python:
-  - 3.6
+  - 3.7
 cache:
   directories:
     - $HOME/.cache/pip
     - $HOME/.ccache  # https://github.com/travis-ci/travis-ci/issues/5853
+env:
+  global:
+    # Doctr deploy key for bluesky/bluesky.github.io
+    - secure: "qYr6wWRJJlDwTanJZbfVcqeXumSWBf7RAmD0ANVPKt/9+bp/UtvpZ2ydJwNTggsIBvdIwJa9BffSPy7+FnhA2zzldIMRfkbQJ6ayy2h8aKcEXflpQ4AtRWCvv1CDWQVfRhvt1lSlhBml3qPJz0a7y0YU769cpGP6NEUm4aC5E4uSP5SzmeUwFIJzvac2FUupxzS9XAW7opMCTBJ6eoC6kyp2LbSdmYf+dZyqStV4eTwszIEbkW0HvbThe1uuX9zDVC/GB4/5Hs/sxbLmDq8uX3Uhvf+kUrRZxMPZ44KWC6RU7xXzHQmDvOvbPYBhcTnql+OiAEWWkt4mbCOp5hpZdUp1Lik4Gc8ixiEK5hRKEXGeGh0EChBye7gw7ep9PYpiCvb43QCeQZFWJlwafklHlteiaB9ADCTI6xbQ0dcpduIX3A1gu//0RJstE17A1wcTE4A6nP0QnIzFBze5cu3XW+uGoydj6v0QwHatJmGrjpjaAFJ5mezEN2yavLNCuHuagUTMKT46hsaDP6LsmR5Ca1nyx9hXjw2sxW3sP23i4UJiGFlEy3FBiN7tQaqrgDdXjs+i5xvsBFZhKc0hWQqld41O4kjw77vf5LDVzHKGIlPhkM89ne3XL1QX2NAL9VQJy7jT5wJAtT1pmWNcKnUE9/K8jMN41Nc/uLTq6wf5cpg="
+
 
 install:
   # Install this package and the packages listed in requirements.txt.
@@ -18,3 +24,6 @@ script:
   - codecov  # Upload the report to codecov.
   - flake8 --max-line-length=115  # Enforce code style (but relax line length limit a bit).
   - make -C docs html  # Build the documentation.
+  - set -e
+  - pip install doctr
+  - doctr deploy --deploy-repo bluesky/bluesky.github.io --deploy-branch-name master bluesky-darkframes;
