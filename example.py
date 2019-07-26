@@ -1,25 +1,15 @@
 from bluesky import RunEngine
-import tempfile
+from databroker import Broker
 from event_model import RunRouter
 from suitcase.msgpack import Serializer
 from ophyd.sim import NumpySeqHandler
 from pathlib import Path
-STORAGE_DIRECTORY = tempfile.TemporaryDirectory().name
-from intake_bluesky.msgpack import BlueskyMsgpackCatalog
-catalog = BlueskyMsgpackCatalog(str(Path(STORAGE_DIRECTORY, '*.msgpack')),
-        handler_registry={'NPY_SEQ': NumpySeqHandler})
-def factory(name, doc):
-    serializer = Serializer(STORAGE_DIRECTORY, flush=True)
-    serializer('start', doc)
-    catalog.force_reload()
-    return [serializer], []
-
-rr = RunRouter([factory])
 
 import bluesky_darkframes
 from bluesky_darkframes.sim import Shutter, DiffractionDetector
 det = DiffractionDetector(name='det')
 shutter = Shutter(name='shutter', value='open')
+db = Broker.named('temp')
 import bluesky.plan_stubs as bps
 from bluesky.plans import count
 import bluesky.utils
@@ -36,7 +26,9 @@ dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
     dark_plan=dark_plan, max_age=3)
 RE = RunEngine()
 RE.preprocessors.append(dark_frame_preprocessor)
-RE.subscribe(rr)
+RE.subscribe(db.insert)
 
-RE(count([det]), print)
-img = catalog[-1].primary.read()['image'][0]
+RE(count([det]))
+db.reg.register_handler('NPY_SEQ', NumpySeqHandler)
+light = list(db[-1].data('image'))[0]
+dark = list(db[-1].data('image', stream_name='dark'))[0]
