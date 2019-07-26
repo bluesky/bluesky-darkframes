@@ -97,14 +97,16 @@ class DarkFramePreprocessor:
         Expected siganture: ``dark_plan() -> snapshot_device``
     max_age: float
         Time after which a fresh dark frame should be acquired
-    locked_signals: Iterable
+    locked_signals: Iterable, optional
         Any changes to these signals invalidate the current dark frame and
         prompt us to take a new one.
-    limit: integer or None
+    limit: integer or None, optional
         Number of dark frames to cache. If None, do not limit.
+    stream_name : string, optional
+        Event stream name for dark frames. Default is 'dark'.
     """
     def __init__(self, *, dark_plan, max_age,
-                 locked_signals=None, limit=None):
+                 locked_signals=None, limit=None, stream_name='dark'):
         self.dark_plan = dark_plan
         self.max_age = max_age
         # The signals have to have unique names for this to work.
@@ -115,6 +117,7 @@ class DarkFramePreprocessor:
                 f"The names given were: {names}")
         self.locked_signals = tuple(locked_signals or ())
         self._limit = limit
+        self.stream_name = stream_name
         # Map state to (creation_time, snapshot).
         self._cache = collections.OrderedDict()
 
@@ -166,7 +169,7 @@ class DarkFramePreprocessor:
                 self.add_snapshot(snapshot, state)
             # Read the Snapshot into the 'dark' Event stream.
             yield from bps.stage(snapshot)
-            yield from bps.trigger_and_read([snapshot], name='dark')
+            yield from bps.trigger_and_read([snapshot], name=self.stream_name)
             yield from bps.unstage(snapshot)
 
         def insert(msg):
