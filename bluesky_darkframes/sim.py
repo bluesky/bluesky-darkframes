@@ -11,7 +11,7 @@ import time
 from bluesky.utils import short_uid
 import numpy as np
 from ophyd import Signal, Device, Component, DeviceStatus
-from ophyd.sim import SynSignal, new_uid
+from ophyd.sim import new_uid
 import scipy.special
 
 
@@ -56,7 +56,7 @@ class TimerStatus(DeviceStatus):
 
 class DiffractionDetector(Device):
     exposure_time = Component(Signal, value=1)
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._resource_uid = None
@@ -90,11 +90,10 @@ class DiffractionDetector(Device):
         np.save(f'{self._path_stem}_{data_counter}.npy', image,
                 allow_pickle=False)
         # Generate a stash and Datum document.
-        datum_id = '{}/{}'.format(self._resource_uid,
-                                    data_counter)
+        datum_id = '{}/{}'.format(self._resource_uid, data_counter)
         datum = {'resource': self._resource_uid,
-                'datum_kwargs': dict(index=data_counter),
-                'datum_id': datum_id}
+                 'datum_kwargs': dict(index=data_counter),
+                 'datum_id': datum_id}
         self._asset_docs_cache.append(('datum', datum))
         self._stashed_image_reading = {'value': datum_id,
                                        'timestamp': time.time()}
