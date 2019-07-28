@@ -5,6 +5,7 @@ coverage
 flake8
 ophyd
 pytest
+scipy
 sphinx
 # These are dependencies of various sphinx extensions for documentation.
 ipython
