@@ -8,6 +8,7 @@ ophyd
 pytest
 scipy
 sphinx
+suitcase-tiff
 # These are dependencies of various sphinx extensions for documentation.
 ipython
 jupyter-sphinx
