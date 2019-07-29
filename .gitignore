@@ -78,3 +78,6 @@ target/
 
 #Ipython Notebook
 .ipynb_checkpoints
+
+# Output from executed examples in sphinx
+docs/exported_files/*
