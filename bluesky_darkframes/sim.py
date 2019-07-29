@@ -105,12 +105,12 @@ class DiffractionDetector(Device):
 
     def read(self):
         ret = super().read()
-        ret['image'] = self._stashed_image_reading
+        ret[f'{self.name}_image'] = self._stashed_image_reading
         return ret
 
     def describe(self):
         ret = super().describe()
-        ret['image'] = self._stashed_image_data_key
+        ret[f'{self.name}_image'] = self._stashed_image_data_key
         return ret
 
     def collect_asset_docs(self):
