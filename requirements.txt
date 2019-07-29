@@ -1,4 +1,4 @@
-bluesky
+bluesky >=1.6.0rc1
 event-model
 frozendict
 numpy
