@@ -33,7 +33,7 @@ class Shutter(Signal):
 
 
 def generate_dark_frame():
-    values = np.random.RandomState(0).random(10) * 0.2
+    values = np.random.RandomState(0).random_sample(10) * 0.2
     # Tile values into bands.
     return np.broadcast_to(np.repeat(values, 20), (200, 200)).copy()
 
