@@ -21,7 +21,8 @@ r *= 20
 r -= 15
 diffraction_pattern = scipy.special.airy(r)[0]
 diffraction_pattern -= diffraction_pattern.min()
-diffraction_pattern *= np.ptp(diffraction_pattern) * 0.5
+diffraction_pattern *= np.ptp(diffraction_pattern) * 0.5 * (2 ** 16)
+diffraction_pattern = diffraction_pattern.astype('uint16')
 
 shutter_state = {'state': 'open'}
 
@@ -33,7 +34,7 @@ class Shutter(Signal):
 
 
 def generate_dark_frame():
-    values = np.random.RandomState(0).random_sample(10) * 0.2
+    values = (np.random.RandomState(0).randint(0, 2**16, 10) * 0.2).astype('uint16')
     # Tile values into bands.
     return np.broadcast_to(np.repeat(values, 20), (200, 200)).copy()
 
