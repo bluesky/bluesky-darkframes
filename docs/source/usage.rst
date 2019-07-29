@@ -96,6 +96,9 @@ dark frames included.
        dark_plan=dark_plan, max_age=30)
    RE.preprocessors.append(dark_frame_preprocessor)
 
+Acquire and Access Data
+=======================
+
 Let's take some data.
 
 .. jupyter-execute::
@@ -111,12 +114,55 @@ and the difference between the two.
 
    import matplotlib.pyplot as plt
 
-   light = list(db[-1].data('image'))[0]
-   dark = list(db[-1].data('image', stream_name='dark'))[0]
+   light = list(db[-1].data('det_image'))[0]
+   dark = list(db[-1].data('det_image', stream_name='dark'))[0]
    fig, axes = plt.subplots(1, 3)
    titles = ('Light', 'Dark', 'Subtracted')
    for image, ax, title in zip((light, dark, light - dark), axes, titles):
       ax.imshow(image);
       ax.set_title(title);
 
-TO DO: Document exporting subtracted images.
+Export Subtracted Images
+========================
+
+In this example we'll export the data to a TIFF series, but it could equally
+well be written to any other storage format.
+
+Export saved data
+-----------------
+
+First we'll define a convenience function.
+
+.. jupyter-execute::
+
+   from bluesky_darkframes import DarkSubtraction
+   from suitcase.tiff_series import Serializer
+
+   def export_subtracted_tiff_series(header, *args, **kwargs):
+       subtractor = DarkSubtraction('det_image')
+       with Serializer(*args, **kwargs) as serializer:
+           for name, doc in header.documents(fill=True):
+               name, doc = subtractor(name, doc)
+               serializer(name, doc)
+
+And now apply it to the data we just took.
+
+.. jupyter-execute::
+
+   export_subtracted_tiff_series(db[-1], 'exported_files/')
+
+This exports the subtracted images (with 'primary' in the name) and the dark
+frames (with 'dark') in the name, which makes it possible to reconstruct the
+original if desired.
+
+.. jupyter-execute::
+
+   !ls exported_files
+
+To customize the file name and other output options, see
+:class:`suitcase.tiff_series.Serializer`.
+
+Export data during acquisition (streaming)
+------------------------------------------
+
+TO DO
