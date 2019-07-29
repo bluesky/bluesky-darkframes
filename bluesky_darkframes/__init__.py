@@ -185,12 +185,10 @@ class DarkSubtraction(event_model.DocumentRouter):
     def __init__(self,
                  field,
                  light_stream_name='primary',
-                 dark_stream_name='dark',
-                 inplace=False):
+                 dark_stream_name='dark'):
         self.field = field
         self.light_stream_name = light_stream_name
         self.dark_stream_name = dark_stream_name
-        self.inplace = inplace
         self.light_descriptor = None
         self.dark_descriptor = None
         self.dark_frame = None
@@ -203,27 +201,14 @@ class DarkSubtraction(event_model.DocumentRouter):
         return super().descriptor(doc)
 
     def event_page(self, doc):
-        event = self.event  # Avoid attribute lookup in hot loop.
-        filled_events = []
-
-        for event_doc in event_model.unpack_event_page(doc):
-            filled_events.append(event(event_doc))
-        new_event_page = event_model.pack_event_page(*filled_events)
-        if self.inplace:
-            # Modify original doc in place, as we do with 'event'.
-            doc['data'] = new_event_page['data']
-            return super().event_page(doc)
-        else:
-            return super().event_page(new_event_page)
-
-    def event(self, doc):
-        if not self.inplace:
-            doc = copy.deepcopy(doc)
         if doc['descriptor'] == self.dark_descriptor:
-            self.dark_frame = doc['data'][self.field]
+            self.dark_frame, = doc['data'][self.field]
         if doc['descriptor'] == self.primary_descriptor:
-            doc['data'][self.field] = self.subtract(doc['data'][self.field], self.dark_frame)
-        return super().event(doc)
+            doc = copy.deepcopy(dict(doc))
+            light = numpy.asarray(doc['data'][self.field])
+            subtracted = self.subtract(light, self.dark_frame)
+            doc['data'][self.field] = subtracted
+        return super().event_page(doc)
 
     def subtract(self, light, dark):
         return numpy.clip(light - dark, a_min=0, a_max=None).astype(light.dtype)
