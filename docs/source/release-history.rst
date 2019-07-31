@@ -5,7 +5,8 @@ Release History
 v0.1.2 (2019-07-31)
 -------------------
 
-* Fix bug in ``locked_signals`` feature.
+* Fix critical bug in ``locked_signals`` feature and one-by-one bug in
+  ``limit`` feature.
 
 v0.1.1 (2019-07-31)
 -------------------
