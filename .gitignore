@@ -81,3 +81,4 @@ target/
 
 # Output from executed examples in sphinx
 docs/exported_files/*
+docs/live_exported_files/*

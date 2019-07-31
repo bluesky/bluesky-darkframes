@@ -27,14 +27,6 @@ class SnapshotDevice(Device):
     device: Device
     """
     def __init__(self, device):
-        self._describe = None
-        self._describe_configuration = None
-        self._read = None
-        self._read_configuration = None
-        self._read_attrs = None
-        self._configuration_attrs = None
-        self._asset_docs_cache = None
-        self._assets_collected = False
         super().__init__(name=device.name, parent=device.parent)
 
         self._describe = device.describe()
@@ -44,6 +36,7 @@ class SnapshotDevice(Device):
         self._read_attrs = list(device.read())
         self._configuration_attrs = list(device.read_configuration())
         self._asset_docs_cache = list(device.collect_asset_docs())
+        self._assets_collected = False
 
     def __repr__(self):
         return f"<SnapshotDevice of {self.name}>"
@@ -195,7 +188,7 @@ class DarkSubtraction(event_model.DocumentRouter):
 
     def descriptor(self, doc):
         if doc['name'] == self.light_stream_name:
-            self.primary_descriptor = doc['uid']
+            self.light_descriptor = doc['uid']
         elif doc['name'] == self.dark_stream_name:
             self.dark_descriptor = doc['uid']
         return super().descriptor(doc)
@@ -203,7 +196,7 @@ class DarkSubtraction(event_model.DocumentRouter):
     def event_page(self, doc):
         if doc['descriptor'] == self.dark_descriptor:
             self.dark_frame, = doc['data'][self.field]
-        if doc['descriptor'] == self.primary_descriptor:
+        if doc['descriptor'] == self.light_descriptor:
             doc = copy.deepcopy(dict(doc))
             light = numpy.asarray(doc['data'][self.field])
             subtracted = self.subtract(light, self.dark_frame)

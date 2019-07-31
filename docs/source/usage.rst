@@ -41,10 +41,14 @@ for whether/how dark frames can be reused.)
 
    def dark_plan():
        yield from bps.mv(shutter, 'closed')
+       yield from bps.unstage(det)
+       yield from bps.stage(det)
        yield from bps.trigger(det, group='darkframe-trigger')
        yield from bps.wait('darkframe-trigger')
-       yield from bps.mv(shutter, 'open')
        snapshot = bluesky_darkframes.SnapshotDevice(det)
+       yield from bps.unstage(det)
+       yield from bps.stage(det)
+       yield from bps.mv(shutter, 'open')
        return snapshot
 
 This is boilerplate bluesky and databroker setup not specificially related to
@@ -59,7 +63,7 @@ dark-frames.
    db = Broker.named('temp')
    db.reg.register_handler('NPY_SEQ', NumpySeqHandler)
    RE = RunEngine()
-   RE.subscribe(db.insert)
+   RE.subscribe(db.insert);
 
 Here we set the rules for when to take fresh dark frames, (2). Examples:
 
@@ -165,4 +169,48 @@ To customize the file name and other output options, see
 Export data during acquisition (streaming)
 ------------------------------------------
 
-TO DO
+Here we use a :class:`event_model.RunRouter`.
+
+.. jupyter-execute::
+
+   from bluesky_darkframes import DarkSubtraction
+   from event_model import RunRouter, Filler
+   from suitcase.tiff_series import Serializer
+
+   def factory(name, doc):
+       # The problem this is solving is to store documents from this run long
+       # enough to cross-reference them (e.g. light frames and dark frames),
+       # and then tearing it down when we're done with this run.
+       subtractor = DarkSubtraction('det_image')
+       serializer = Serializer('live_exported_files/')
+       filler = Filler(db.reg.handler_reg, inplace=False)
+
+       # Here we push the run 'start' doc through.
+       subtractor(name, doc)
+       serializer(name, doc)
+       filler(name, doc)
+
+       # And by returning this function below, we are routing all other
+       # documents *for this run* through here.
+       def fill_subtract_and_serialize(name, doc):
+           name, doc = filler(name, doc)
+           name, doc = subtractor(name, doc)
+           serializer(name, doc)
+
+       return [fill_subtract_and_serialize], []
+
+   rr = RunRouter([factory])
+   RE.subscribe(rr);
+
+Now take some data.
+
+.. jupyter-execute::
+   :stderr:
+
+   RE(count([det]))
+
+And see that files have been generated.
+
+.. jupyter-execute::
+
+   !ls live_exported_files
