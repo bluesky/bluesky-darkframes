@@ -153,8 +153,12 @@ class DarkFramePreprocessor:
             # Acquire a fresh Snapshot if we need one, or retrieve a cached one.
             state = {}
             for signal in self.locked_signals:
-                reading = yield bluesky.plan_stubs.read(signal)
-                state[signal.name] = reading
+                reading = yield from bluesky.plan_stubs.read(signal)
+                # Restructure
+                # {'data_key': {'value': <value>, 'timestamp': <timestamp>}, ...}
+                # into (('data_key', <value>) ...).
+                values_only = tuple((k, v['value']) for k, v in reading.items())
+                state[signal.name] = values_only
             try:
                 snapshot = self.get_snapshot(state)
             except NoMatchingSnapshot:
