@@ -41,10 +41,14 @@ for whether/how dark frames can be reused.)
 
    def dark_plan():
        yield from bps.mv(shutter, 'closed')
+       yield from bps.unstage(det)
+       yield from bps.stage(det)
        yield from bps.trigger(det, group='darkframe-trigger')
        yield from bps.wait('darkframe-trigger')
-       yield from bps.mv(shutter, 'open')
        snapshot = bluesky_darkframes.SnapshotDevice(det)
+       yield from bps.unstage(det)
+       yield from bps.stage(det)
+       yield from bps.mv(shutter, 'open')
        return snapshot
 
 This is boilerplate bluesky and databroker setup not specificially related to
