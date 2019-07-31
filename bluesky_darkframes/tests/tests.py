@@ -85,3 +85,35 @@ def test_locked_signals(RE):
     RE(bps.mv(det.exposure_time, 0.01))
     RE(count([img]))
     assert len(dark_frame_preprocessor._cache) == 2
+
+
+def test_limit(RE):
+    """
+    Test that if a 'locked signal' is changed, a new dark frame is taken, but
+    if the locked signal goes back to the original value, the original dark
+    frame is reused.
+    """
+    # This tests an internal detail.
+    dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
+        dark_plan=dark_plan, max_age=100,
+        locked_signals=[det.exposure_time],
+        limit=1)
+    RE.preprocessors.append(dark_frame_preprocessor)
+    RE(count([img]))
+    assert len(dark_frame_preprocessor._cache) == 1
+    state, = dark_frame_preprocessor._cache
+    previous_state = state
+    RE(bps.mv(det.exposure_time, 0.02))
+    # This should take a new dark frame and evict the last one.
+    RE(count([img]))
+    assert len(dark_frame_preprocessor._cache) == 1
+    state, = dark_frame_preprocessor._cache
+    assert state != previous_state
+    previous_state = state
+    # This should take a new dark frame and evict the last one.
+    RE(bps.mv(det.exposure_time, 0.01))
+    RE(count([img]))
+    assert len(dark_frame_preprocessor._cache) == 1
+    state, = dark_frame_preprocessor._cache
+    assert state != previous_state
+    previous_state = state

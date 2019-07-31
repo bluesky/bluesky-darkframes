@@ -118,7 +118,7 @@ class DarkFramePreprocessor:
         logger.debug("Captured snapshot for state %r", state)
         state = state or {}
         self._evict_old_entries()
-        if self._limit is not None and len(self._cache) > self._limit:
+        if self._limit is not None and len(self._cache) >= self._limit:
             self._cache.popitem()
         self._cache[frozendict(state)] = (time.monotonic(), snapshot)
 
