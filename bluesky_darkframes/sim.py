@@ -10,7 +10,7 @@ import time
 
 from bluesky.utils import short_uid
 import numpy as np
-from ophyd import Signal, Device, Component, DeviceStatus
+from ophyd import Signal, Device, Component, DeviceStatus, Staged
 from ophyd.sim import new_uid
 import scipy.special
 
@@ -82,8 +82,11 @@ class DiffractionDetector(Device):
                     'uid': self._resource_uid,
                     'path_semantics': {'posix': 'posix', 'nt': 'windows'}[os.name]}
         self._asset_docs_cache.append(('resource', resource))
+        return super().stage()
 
     def trigger(self):
+        if not self._staged == Staged.yes:
+            raise RuntimeError("Device must be staged before it is triggered.")
         image = generate_image(dark=shutter_state['state'] == 'closed')
         # Save the actual reading['value'] to disk. For a real detector,
         # this part would be done by the detector IOC, not by ophyd.
@@ -125,3 +128,4 @@ class DiffractionDetector(Device):
         self._datum_counter = None
         self._asset_docs_cache.clear()
         self._path_stem = None
+        return super().unstage()
