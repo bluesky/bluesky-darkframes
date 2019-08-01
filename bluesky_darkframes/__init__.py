@@ -71,10 +71,6 @@ class SnapshotDevice(Device):
         self._assets_collected = False
 
 
-class NoMatchingSnapshot(KeyError):
-    ...
-
-
 class DarkFramePreprocessor:
     """
     A plan preprocessor that ensures each Run records a dark frame.
@@ -105,7 +101,7 @@ class DarkFramePreprocessor:
         # The signals have to have unique names for this to work.
         names = [signal.name for signal in locked_signals or ()]
         if len(names) != len(set(names)):
-            raise ValueError(
+            raise BlueskyDarkframesValueError(
                 f"The signals in locked_signals need to have unique names. "
                 f"The names given were: {names}")
         self.locked_signals = tuple(locked_signals or ())
@@ -201,6 +197,10 @@ class DarkSubtraction(event_model.DocumentRouter):
         if doc['descriptor'] == self.dark_descriptor:
             self.dark_frame, = doc['data'][self.field]
         if doc['descriptor'] == self.light_descriptor:
+            if self.dark_frame is None:
+                raise NoDarkFrame(
+                    "DarkSubtraction has not received a 'dark' Event yet, so "
+                    "it has nothing to subtract.")
             doc = copy.deepcopy(dict(doc))
             light = numpy.asarray(doc['data'][self.field])
             subtracted = self.subtract(light, self.dark_frame)
@@ -209,3 +209,19 @@ class DarkSubtraction(event_model.DocumentRouter):
 
     def subtract(self, light, dark):
         return numpy.clip(light - dark, a_min=0, a_max=None).astype(light.dtype)
+
+
+class BlueskyDarkframesException(Exception):
+    ...
+
+
+class BlueskyDarkframesValueError(ValueError, BlueskyDarkframesException):
+    ...
+
+
+class NoDarkFrame(RuntimeError, BlueskyDarkframesException):
+    ...
+
+
+class NoMatchingSnapshot(KeyError, BlueskyDarkframesException):
+    ...
