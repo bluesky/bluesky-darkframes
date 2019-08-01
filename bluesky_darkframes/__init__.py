@@ -91,7 +91,7 @@ class DarkFramePreprocessor:
         prompt us to take a new one.
     limit: integer or None, optional
         Number of dark frames to cache. If None, do not limit.
-    stream_name : string, optional
+    stream_name: string, optional
         Event stream name for dark frames. Default is 'dark'.
     """
     def __init__(self, *, dark_plan, max_age,
@@ -112,9 +112,20 @@ class DarkFramePreprocessor:
 
     @property
     def cache(self):
+        """
+        A read-only view of the cached dark frames.
+        """
         return self._cache
 
     def add_snapshot(self, snapshot, state=None):
+        """
+        Add a darkframe.
+
+        Parameters
+        ----------
+        snapshot: SnapshotDevice
+        state: dict, optional
+        """
         logger.debug("Captured snapshot for state %r", state)
         state = state or {}
         self._evict_old_entries()
@@ -131,6 +142,13 @@ class DarkFramePreprocessor:
                 del self._cache[key]
 
     def get_snapshot(self, state):
+        """
+        Access a darkframe.
+
+        Parameters
+        ----------
+        state: dict
+        """
         self._evict_old_entries()
         key = frozendict(state)
         try:
@@ -144,6 +162,9 @@ class DarkFramePreprocessor:
             return snapshot
 
     def clear(self):
+        """
+        Clear all cached darkframes.
+        """
         self._cache.clear()
 
     def __call__(self, plan):
