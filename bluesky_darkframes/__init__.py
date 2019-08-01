@@ -110,6 +110,10 @@ class DarkFramePreprocessor:
         # Map state to (creation_time, snapshot).
         self._cache = collections.OrderedDict()
 
+    @property
+    def cache(self):
+        return self._cache
+
     def add_snapshot(self, snapshot, state=None):
         logger.debug("Captured snapshot for state %r", state)
         state = state or {}
