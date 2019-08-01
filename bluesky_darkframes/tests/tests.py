@@ -1,14 +1,15 @@
 import time
-
-import bluesky_darkframes
-import bluesky_darkframes.sim
-from bluesky.plans import count
-from ophyd.sim import img
-import pytest
-
+import os
 
 import bluesky.plan_stubs as bps
 import bluesky_darkframes
+import bluesky_darkframes.sim
+from bluesky.plans import count
+from event_model import RunRouter, Filler
+from ophyd.sim import img, NumpySeqHandler
+import pytest
+from suitcase.tiff_series import Serializer
+
 
 # This is some simulated hardware for demo purposes.
 det = bluesky_darkframes.sim.DiffractionDetector(name='det')
@@ -114,3 +115,78 @@ def test_limit(RE):
     state, = dark_frame_preprocessor.cache
     assert state != previous_state
     previous_state = state
+
+
+def test_streaming_export(RE, tmp_path):
+    """
+    Test that DarkSubtractor generates files when subscribed to RE.
+    """
+    def factory(name, doc):
+        # The problem this is solving is to store documents from this run long
+        # enough to cross-reference them (e.g. light frames and dark frames),
+        # and then tearing it down when we're done with this run.
+        subtractor = bluesky_darkframes.DarkSubtraction('det_image')
+        serializer = Serializer(tmp_path)
+        filler = Filler({'NPY_SEQ': NumpySeqHandler}, inplace=False)
+
+        # Here we push the run 'start' doc through.
+        subtractor(name, doc)
+        serializer(name, doc)
+        filler(name, doc)
+
+        # And by returning this function below, we are routing all other
+        # documents *for this run* through here.
+        def fill_subtract_and_serialize(name, doc):
+            name, doc = filler(name, doc)
+            name, doc = subtractor(name, doc)
+            serializer(name, doc)
+
+        return [fill_subtract_and_serialize], []
+
+    rr = RunRouter([factory])
+    RE.subscribe(rr)
+
+    dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
+        dark_plan=dark_plan, max_age=100)
+    RE.preprocessors.append(dark_frame_preprocessor)
+
+    RE(count([det]))
+    exported_files = os.listdir(tmp_path)
+
+    assert len(exported_files) == 2
+
+
+def test_no_dark_frames(RE, tmp_path):
+    """
+    Test that a readable error is raised if no 'dark' frame is received.
+    """
+    def factory(name, doc):
+        # The problem this is solving is to store documents from this run long
+        # enough to cross-reference them (e.g. light frames and dark frames),
+        # and then tearing it down when we're done with this run.
+        subtractor = bluesky_darkframes.DarkSubtraction('det_image')
+        serializer = Serializer(tmp_path)
+        filler = Filler({'NPY_SEQ': NumpySeqHandler}, inplace=False)
+
+        # Here we push the run 'start' doc through.
+        subtractor(name, doc)
+        serializer(name, doc)
+        filler(name, doc)
+
+        # And by returning this function below, we are routing all other
+        # documents *for this run* through here.
+        def fill_subtract_and_serialize(name, doc):
+            name, doc = filler(name, doc)
+            name, doc = subtractor(name, doc)
+            serializer(name, doc)
+
+        return [fill_subtract_and_serialize], []
+
+    rr = RunRouter([factory])
+    RE.subscribe(rr)
+
+    # We intentionally 'forget' to set up a dark_frame_preprocessor for this
+    # test.
+
+    with pytest.raises(bluesky_darkframes.NoDarkFrame):
+        RE(count([det]))
