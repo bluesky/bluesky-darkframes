@@ -2,6 +2,14 @@
 Release History
 ===============
 
+v0.1.3 (2019-08-05)
+-------------------
+
+This release mostly consists of documentation and small usability improvements.
+
+* Expose ``cache`` as a public properly.
+* Raise more specific Exception types.
+
 v0.1.2 (2019-07-31)
 -------------------
 
