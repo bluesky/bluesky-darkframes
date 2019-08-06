@@ -203,13 +203,15 @@ class DarkSubtraction(event_model.DocumentRouter):
     def __init__(self,
                  field,
                  light_stream_name='primary',
-                 dark_stream_name='dark'):
+                 dark_stream_name='dark',
+                 pedestal=0):
         self.field = field
         self.light_stream_name = light_stream_name
         self.dark_stream_name = dark_stream_name
         self.light_descriptor = None
         self.dark_descriptor = None
         self.dark_frame = None
+        self.pedestal = pedestal
 
     def descriptor(self, doc):
         if doc['name'] == self.light_stream_name:
@@ -221,6 +223,8 @@ class DarkSubtraction(event_model.DocumentRouter):
     def event_page(self, doc):
         if doc['descriptor'] == self.dark_descriptor:
             self.dark_frame, = doc['data'][self.field]
+            self.dark_frame -= self.pedestal
+            numpy.clip(self.dark_frame, a_min=0, a_max=None, out=self.dark_frame)
         if doc['descriptor'] == self.light_descriptor:
             if self.dark_frame is None:
                 raise NoDarkFrame(
