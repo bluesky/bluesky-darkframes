@@ -209,6 +209,11 @@ class DarkSubtraction(event_model.DocumentRouter):
         np.clip(light - np.clip(dark - pedestal, 0), 0)
 
 
+    Adds the key f'{self.field}_is_background_subtracted' to the
+    'light_stream_name' stream and a configuration key for the
+    pedestal value.
+
+
     .. warning
 
        This mutates the document stream in-place!
