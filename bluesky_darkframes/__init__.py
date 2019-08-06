@@ -200,6 +200,48 @@ class DarkFramePreprocessor:
 
 
 class DarkSubtraction(event_model.DocumentRouter):
+    """Document router to do in-place background subtraction.
+
+    Expects that the events are filled.
+
+    The values in `(light_stream_name, field)` are replaced with ::
+
+        np.clip(light - np.clip(dark - pedestal, 0), 0)
+
+
+    .. warning
+
+       This mutates the document stream in-place!
+
+
+    Parameters
+    ----------
+    field : str
+        The name of the field to do the background subtraction on.
+
+        This field must contain the light-field values in the
+        'light-stream' and the background images in the 'dark-stream'
+
+    light_stream_name : str, optional
+         The stream that contains the exposed images that need to be
+         background subtracted.
+
+         defaults to 'primary'
+
+    dark_stream_name : str, optional
+         The stream that contains the background dark images.
+
+         defaults to 'dark'
+
+    pedestal : int, optional
+         Pedestal to add to the data to make sure subtracted  does not fall below
+         0.
+
+         This is actually pre subtracted from the dark frame for efficiency.
+
+         defaults to 100
+
+    """
     def __init__(self,
                  field,
                  light_stream_name='primary',
