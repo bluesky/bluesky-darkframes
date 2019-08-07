@@ -43,6 +43,18 @@ def test_one_dark_event_emitted(RE):
     RE(count([det], 3), verify_one_dark_frame)
 
 
+def test_mid_scan_dark_frames(RE):
+    dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
+        dark_plan=dark_plan, max_age=0)
+    RE.preprocessors.append(dark_frame_preprocessor)
+
+    def verify_four_dark_frames(name, doc):
+        if name == 'stop':
+            doc['num_events']['dark'] == 4
+
+    RE(count([det], 3), verify_four_dark_frames)
+
+
 def test_max_age(RE):
     """
     Test the a dark frame is reused until it expires, and then re-taken.
