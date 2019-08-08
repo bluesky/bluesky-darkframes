@@ -271,7 +271,7 @@ class DarkSubtraction(event_model.DocumentRouter):
                 'object_name': f'{self.field}_DarkSubtraction'}
             doc['configuration'][f'{self.field}_DarkSubtraction'] = {
                 'data': {'pedestal': self.pedestal},
-                'data': {'pedestal': time.time()},
+                'timestamp': {'pedestal': time.time()},
                 'data_keys': {
                     'pedestal': {
                         'dtype': 'number',
