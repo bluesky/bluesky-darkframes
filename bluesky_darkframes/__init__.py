@@ -71,6 +71,20 @@ class SnapshotDevice(Device):
         self._assets_collected = False
 
 
+class _SnapshotShell:
+    # This enables us to hot-swap Snapshot instances in the middle of a Run.
+    # We hand this object to the RunEngine, so it sees one consistent
+    # instance throughout the Run.
+    def __init__(self):
+        self.__snapshot = None
+
+    def set_snaphsot(self, snapshot):
+        self.__snapshot = snapshot
+
+    def __getattr__(self, key):
+        return getattr(self.__snapshot, key)
+
+
 class DarkFramePreprocessor:
     """
     A plan preprocessor that ensures each Run records a dark frame.
@@ -109,6 +123,8 @@ class DarkFramePreprocessor:
         self.stream_name = stream_name
         # Map state to (creation_time, snapshot).
         self._cache = collections.OrderedDict()
+        self._current_snapshot = _SnapshotShell()
+        self._current_state = None
 
     @property
     def cache(self):
@@ -170,7 +186,7 @@ class DarkFramePreprocessor:
     def __call__(self, plan):
         "Preprocessor: Takes in a plan and creates a modified plan."
 
-        def tail():
+        def tail(force_read):
             # Acquire a fresh Snapshot if we need one, or retrieve a cached one.
             state = {}
             for signal in self.locked_signals:
@@ -180,19 +196,28 @@ class DarkFramePreprocessor:
                 # into (('data_key', <value>) ...).
                 values_only = tuple((k, v['value']) for k, v in reading.items())
                 state[signal.name] = values_only
+            if self._current_state != state:
+                self._current_state = state
+                snapshot_changed = True
+            else:
+                snapshot_changed = False
             try:
                 snapshot = self.get_snapshot(state)
             except NoMatchingSnapshot:
                 snapshot = yield from self.dark_plan()
                 self.add_snapshot(snapshot, state)
-            # Read the Snapshot into the 'dark' Event stream.
-            yield from bps.stage(snapshot)
-            yield from bps.trigger_and_read([snapshot], name=self.stream_name)
-            yield from bps.unstage(snapshot)
+            if snapshot_changed or force_read:
+                self._current_snapshot.set_snaphsot(snapshot)
+                # Read the Snapshot into the 'dark' Event stream.
+                yield from bps.stage(self._current_snapshot)
+                yield from bps.trigger_and_read([self._current_snapshot],
+                                                name=self.stream_name)
+                yield from bps.unstage(self._current_snapshot)
 
         def insert(msg):
-            if msg.command == 'open_run':
-                return None, tail()
+            if msg.command in ('open_run', 'save'):
+                # Always stash a reading if this is a new Run.
+                return None, tail(force_read=msg.command == 'open_run')
             else:
                 return None, None
 
