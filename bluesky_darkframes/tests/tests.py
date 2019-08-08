@@ -117,7 +117,8 @@ def test_limit(RE):
     previous_state = state
 
 
-def test_streaming_export(RE, tmp_path):
+@pytest.mark.parametrize('pedestal', [None, 0, 100])
+def test_streaming_export(RE, tmp_path, pedestal):
     """
     Test that DarkSubtractor generates files when subscribed to RE.
     """
@@ -125,7 +126,10 @@ def test_streaming_export(RE, tmp_path):
         # The problem this is solving is to store documents from this run long
         # enough to cross-reference them (e.g. light frames and dark frames),
         # and then tearing it down when we're done with this run.
-        subtractor = bluesky_darkframes.DarkSubtraction('det_image')
+        kwargs = {}
+        if pedestal is not None:
+            kwargs['pedestal'] = pedestal
+        subtractor = bluesky_darkframes.DarkSubtraction('det_image', **kwargs)
         serializer = Serializer(tmp_path)
         filler = Filler({'NPY_SEQ': NumpySeqHandler}, inplace=False)
 
