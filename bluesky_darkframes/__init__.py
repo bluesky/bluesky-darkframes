@@ -264,8 +264,8 @@ class DarkSubtraction(event_model.DocumentRouter):
          defaults to 'dark'
 
     pedestal : int, optional
-         Pedestal to add to the data to make sure subtracted  does not fall below
-         0.
+         Pedestal to add to the data to make sure subtracted result does not
+         fall below 0.
 
          This is actually pre subtracted from the dark frame for efficiency.
 

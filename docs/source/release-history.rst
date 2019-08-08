@@ -2,6 +2,19 @@
 Release History
 ===============
 
+v0.2.0 (2019-08-08)
+-------------------
+
+Thie release adds two features that change the default behavior:
+
+* Check whether a new dark frame is needed and, if so, take one after each
+  Event is closed (i.e. after each 'save' message) in addition to after each
+  Run is opened (i.e. after each 'open_run' message).
+* Support a ``pedestal`` parameter.
+  :class:`~bluesky_darkframes.DarkSubtraction`, which defaults to ``100``. This
+  helps avoid negative values in the subtracted image. See docstring for
+  details.
+
 v0.1.3 (2019-08-05)
 -------------------
 
