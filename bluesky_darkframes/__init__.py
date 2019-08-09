@@ -186,7 +186,7 @@ class DarkFramePreprocessor:
     def __call__(self, plan):
         "Preprocessor: Takes in a plan and creates a modified plan."
 
-        def tail(force_read):
+        def insert_dark_frame(force_read, msg=None):
             # Acquire a fresh Snapshot if we need one, or retrieve a cached one.
             state = {}
             for signal in self.locked_signals:
@@ -213,15 +213,21 @@ class DarkFramePreprocessor:
                 yield from bps.trigger_and_read([self._current_snapshot],
                                                 name=self.stream_name)
                 yield from bps.unstage(self._current_snapshot)
+            if msg is not None:
+                return (yield msg)
 
-        def insert(msg):
-            if msg.command in ('open_run', 'save'):
+        def maybe_insert_dark_frame(msg):
+            if msg.command == 'open_run':
                 # Always stash a reading if this is a new Run.
-                return None, tail(force_read=msg.command == 'open_run')
+                return None, insert_dark_frame(force_read=True)
+            if msg.command == 'create':
+                # Only stash a reading if the most recent one is not applicable.
+                return insert_dark_frame(force_read=False, msg=msg), None
             else:
                 return None, None
 
-        return (yield from bluesky.preprocessors.plan_mutator(plan, insert))
+        return (yield from bluesky.preprocessors.plan_mutator(
+            plan, maybe_insert_dark_frame))
 
 
 class DarkSubtraction(event_model.DocumentRouter):
