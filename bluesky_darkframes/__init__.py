@@ -125,6 +125,7 @@ class DarkFramePreprocessor:
         self._cache = collections.OrderedDict()
         self._current_snapshot = _SnapshotShell()
         self._current_state = None
+        self._force_read_before_next_event = True
 
     @property
     def cache(self):
@@ -217,12 +218,13 @@ class DarkFramePreprocessor:
                 return (yield msg)
 
         def maybe_insert_dark_frame(msg):
-            if msg.command == 'open_run':
-                # Always stash a reading if this is a new Run.
-                return None, insert_dark_frame(force_read=True)
             if msg.command == 'create':
-                # Only stash a reading if the most recent one is not applicable.
-                return insert_dark_frame(force_read=False, msg=msg), None
+                force_read = self._force_read_before_next_event
+                self._force_read_before_next_event = False
+                return insert_dark_frame(force_read=force_read, msg=msg), None
+            elif msg.command == 'open_run':
+                self._force_read_before_next_event = True
+                return None, None
             else:
                 return None, None
 
