@@ -6,7 +6,7 @@ import bluesky_darkframes
 import bluesky_darkframes.sim
 from bluesky.plans import count
 from event_model import RunRouter, Filler
-from ophyd.sim import img, NumpySeqHandler
+from ophyd.sim import NumpySeqHandler
 import pytest
 from suitcase.tiff_series import Serializer
 
@@ -19,13 +19,9 @@ shutter = bluesky_darkframes.sim.Shutter(name='shutter', value='open')
 
 def dark_plan():
     yield from bps.mv(shutter, 'closed')
-    yield from bps.unstage(det)
-    yield from bps.stage(det)
     yield from bps.trigger(det, group='darkframe-trigger')
     yield from bps.wait('darkframe-trigger')
     snapshot = bluesky_darkframes.SnapshotDevice(det)
-    yield from bps.unstage(det)
-    yield from bps.stage(det)
     yield from bps.mv(shutter, 'open')
     return snapshot
 
@@ -63,11 +59,11 @@ def test_max_age(RE):
         dark_plan=dark_plan, max_age=1)
     RE.preprocessors.append(dark_frame_preprocessor)
     # The first executation adds something to the cache.
-    RE(count([img]))
+    RE(count([det]))
     assert len(dark_frame_preprocessor.cache) == 1
     state, = dark_frame_preprocessor.cache
     # A second execution reuses the cache entry, adds nothing.
-    RE(count([img]))
+    RE(count([det]))
     assert len(dark_frame_preprocessor.cache) == 1
     dark_frame_preprocessor.get_snapshot(state)
     # Wait for it to age out.
@@ -86,15 +82,15 @@ def test_locked_signals(RE):
         dark_plan=dark_plan, max_age=100,
         locked_signals=[det.exposure_time])
     RE.preprocessors.append(dark_frame_preprocessor)
-    RE(count([img]))
+    RE(count([det]))
     assert len(dark_frame_preprocessor.cache) == 1
     RE(bps.mv(det.exposure_time, 0.02))
     # This should take a new dark frame.
-    RE(count([img]))
+    RE(count([det]))
     assert len(dark_frame_preprocessor.cache) == 2
     # This should reuse the first one.
     RE(bps.mv(det.exposure_time, 0.01))
-    RE(count([img]))
+    RE(count([det]))
     assert len(dark_frame_preprocessor.cache) == 2
 
 
@@ -109,20 +105,20 @@ def test_limit(RE):
         locked_signals=[det.exposure_time],
         limit=1)
     RE.preprocessors.append(dark_frame_preprocessor)
-    RE(count([img]))
+    RE(count([det]))
     assert len(dark_frame_preprocessor.cache) == 1
     state, = dark_frame_preprocessor.cache
     previous_state = state
     RE(bps.mv(det.exposure_time, 0.02))
     # This should take a new dark frame and evict the last one.
-    RE(count([img]))
+    RE(count([det]))
     assert len(dark_frame_preprocessor.cache) == 1
     state, = dark_frame_preprocessor.cache
     assert state != previous_state
     previous_state = state
     # This should take a new dark frame and evict the last one.
     RE(bps.mv(det.exposure_time, 0.01))
-    RE(count([img]))
+    RE(count([det]))
     assert len(dark_frame_preprocessor.cache) == 1
     state, = dark_frame_preprocessor.cache
     assert state != previous_state
