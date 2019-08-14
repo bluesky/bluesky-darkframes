@@ -325,7 +325,7 @@ class DarkSubtraction(event_model.DocumentRouter):
             self.dark_frame, = doc['data'][self.field]
             self.dark_frame -= self.pedestal
             numpy.clip(self.dark_frame, a_min=0, a_max=None, out=self.dark_frame)
-        if doc['descriptor'] == self.light_descriptor:
+        elif doc['descriptor'] == self.light_descriptor:
             if self.dark_frame is None:
                 raise NoDarkFrame(
                     "DarkSubtraction has not received a 'dark' Event yet, so "
