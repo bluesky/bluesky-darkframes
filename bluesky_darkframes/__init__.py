@@ -98,6 +98,7 @@ class DarkFramePreprocessor:
     ----------
     dark_plan: callable
         Expected siganture: ``dark_plan() -> snapshot_device``
+    detector : Device
     max_age: float
         Time after which a fresh dark frame should be acquired
     locked_signals: Iterable, optional
@@ -108,9 +109,10 @@ class DarkFramePreprocessor:
     stream_name: string, optional
         Event stream name for dark frames. Default is 'dark'.
     """
-    def __init__(self, *, dark_plan, max_age,
+    def __init__(self, *, dark_plan, detector, max_age,
                  locked_signals=None, limit=None, stream_name='dark'):
         self.dark_plan = dark_plan
+        self.detector = detector
         self.max_age = max_age
         # The signals have to have unique names for this to work.
         names = [signal.name for signal in locked_signals or ()]
@@ -126,6 +128,7 @@ class DarkFramePreprocessor:
         self._current_snapshot = _SnapshotShell()
         self._current_state = None
         self._force_read_before_next_event = True
+        self._latch = False
 
     @property
     def cache(self):
@@ -205,22 +208,26 @@ class DarkFramePreprocessor:
             try:
                 snapshot = self.get_snapshot(state)
             except NoMatchingSnapshot:
+                logger.info(f"Taking a new dark frame for state=%r", state)
                 snapshot = yield from self.dark_plan()
                 self.add_snapshot(snapshot, state)
             if snapshot_changed or force_read:
+                logger.info(f"Creating a 'dark' Event for state=%r", state)
                 self._current_snapshot.set_snaphsot(snapshot)
                 # Read the Snapshot into the 'dark' Event stream.
                 yield from bps.stage(self._current_snapshot)
                 yield from bps.trigger_and_read([self._current_snapshot],
                                                 name=self.stream_name)
                 yield from bps.unstage(self._current_snapshot)
+            self._latch = False
             if msg is not None:
                 return (yield msg)
 
         def maybe_insert_dark_frame(msg):
-            if msg.command == 'create':
+            if msg.command == 'trigger' and msg.obj is self.detector and not self._latch:
                 force_read = self._force_read_before_next_event
                 self._force_read_before_next_event = False
+                self._latch = True
                 return insert_dark_frame(force_read=force_read, msg=msg), None
             elif msg.command == 'open_run':
                 self._force_read_before_next_event = True
