@@ -41,13 +41,9 @@ for whether/how dark frames can be reused.)
 
    def dark_plan():
        yield from bps.mv(shutter, 'closed')
-       yield from bps.unstage(det)
-       yield from bps.stage(det)
        yield from bps.trigger(det, group='darkframe-trigger')
        yield from bps.wait('darkframe-trigger')
        snapshot = bluesky_darkframes.SnapshotDevice(det)
-       yield from bps.unstage(det)
-       yield from bps.stage(det)
        yield from bps.mv(shutter, 'open')
        return snapshot
 
@@ -71,24 +67,25 @@ Here we set the rules for when to take fresh dark frames, (2). Examples:
 
    # Always take a fresh dark frame at the beginning of each run.
    dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-       dark_plan=dark_plan, max_age=0)
+       dark_plan=dark_plan, detector=det, max_age=0)
 
    # Take a dark frame if the last one we took is more than 30 seconds old.
    dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-       dark_plan=dark_plan, max_age=30)
+       dark_plan=dark_plan, detector=det, max_age=30)
 
    # Take a fresh dark frame if the last one we took *with this exposure time*
    # is more than 30 seconds old.
    dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-       dark_plan=dark_plan, max_age=30, locked_signals=[det.exposure_time])
+       dark_plan=dark_plan, detector=det, max_age=30,
+       locked_signals=[det.exposure_time])
 
    # Always take a new dark frame if the exposure time was changed from the
    # previous run, even if we took one with this exposure time on some earlier
    # run. Also, re-take if the settings haven't changed but the last dark
    # frame is older than 30 seconds.
    dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-       dark_plan=dark_plan, max_age=30, locked_signals=[det.exposure_time],
-       limit=1)
+       dark_plan=dark_plan, detector=det, max_age=30,
+       locked_signals=[det.exposure_time], limit=1)
 
 We'll pick one example and configure the RunEngine to apply it to all plans.
 This means that any plan, including user-defined ones, will automatically have
@@ -97,7 +94,7 @@ dark frames included.
 .. jupyter-execute::
 
    dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-       dark_plan=dark_plan, max_age=30)
+       dark_plan=dark_plan, detector=det, max_age=30)
    RE.preprocessors.append(dark_frame_preprocessor)
 
 Acquire and Access Data
