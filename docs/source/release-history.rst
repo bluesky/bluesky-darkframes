@@ -2,6 +2,18 @@
 Release History
 ===============
 
+v0.3.0 (2019-08-15)
+-------------------
+
+This release fixes a critical off-by-one issue in v0.2.0. All users are
+recommended to upgrade.
+
+* Associate a given :class:`~bluesky_darkframes.DarkFrameProcessor` instance
+  with a specific detector. This enables it to *only* intercede when that
+  specific detector is triggered and to ignore all other acquisitions.
+* Change the timing of when the conditions for a new dark frame are checked:
+  the check now occurs just before the detector of interest is triggered.
+
 v0.2.0 (2019-08-08)
 -------------------
 
