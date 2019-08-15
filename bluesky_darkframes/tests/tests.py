@@ -28,7 +28,7 @@ def dark_plan():
 
 def test_one_dark_event_emitted(RE):
     dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-        dark_plan=dark_plan, max_age=3)
+        dark_plan=dark_plan, detector=det, max_age=3)
     RE.preprocessors.append(dark_frame_preprocessor)
 
     def verify_one_dark_frame(name, doc):
@@ -41,7 +41,7 @@ def test_one_dark_event_emitted(RE):
 
 def test_mid_scan_dark_frames(RE):
     dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-        dark_plan=dark_plan, max_age=0)
+        dark_plan=dark_plan, detector=det, max_age=0)
     RE.preprocessors.append(dark_frame_preprocessor)
 
     def verify_four_dark_frames(name, doc):
@@ -56,7 +56,7 @@ def test_max_age(RE):
     Test the a dark frame is reused until it expires, and then re-taken.
     """
     dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-        dark_plan=dark_plan, max_age=1)
+        dark_plan=dark_plan, detector=det, max_age=1)
     RE.preprocessors.append(dark_frame_preprocessor)
     # The first executation adds something to the cache.
     RE(count([det]))
@@ -79,7 +79,7 @@ def test_locked_signals(RE):
     frame is reused.
     """
     dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-        dark_plan=dark_plan, max_age=100,
+        dark_plan=dark_plan, detector=det, max_age=100,
         locked_signals=[det.exposure_time])
     RE.preprocessors.append(dark_frame_preprocessor)
     RE(count([det]))
@@ -101,7 +101,7 @@ def test_limit(RE):
     frame is reused.
     """
     dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-        dark_plan=dark_plan, max_age=100,
+        dark_plan=dark_plan, detector=det, max_age=100,
         locked_signals=[det.exposure_time],
         limit=1)
     RE.preprocessors.append(dark_frame_preprocessor)
@@ -159,7 +159,7 @@ def test_streaming_export(RE, tmp_path, pedestal):
     RE.subscribe(rr)
 
     dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-        dark_plan=dark_plan, max_age=100)
+        dark_plan=dark_plan, detector=det, max_age=100)
     RE.preprocessors.append(dark_frame_preprocessor)
 
     RE(count([det]))
