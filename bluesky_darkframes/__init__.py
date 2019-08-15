@@ -15,7 +15,7 @@ __version__ = get_versions()['version']
 del get_versions
 
 
-logger = logging.getLogger('bluesky_darkframe')
+logger = logging.getLogger('bluesky.darkframes')
 
 
 class SnapshotDevice(Device):
