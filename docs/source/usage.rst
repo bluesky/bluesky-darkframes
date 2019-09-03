@@ -2,12 +2,78 @@
 Usage
 =====
 
-The User's Perspective
-======================
+Data Model
+==========
 
-The user executes plans with the RunEngine is the usual way, with no extra
-syntax. An Event stream named 'dark' is added to every Run automatically.
-If desired subtracted frames can be exported to files or a database.
+A typical bluesky Run has an Event Stream named ``'primary'``, an Event Stream
+named ``'baseline`'``, and potentially other Event Streams for signals that are
+monitored asynchronously during the Run. The names of these Event Streams are
+just convention, encoded by the built-in bluesky plans. Plans can define any
+Event Streams that they like.
+
+A natural way to include dark frames with a Run is to add a ``'dark'`` Event
+Stream. Because Events are timestamped, the ``'dark'`` Events can be associated
+with ``'primary'`` Events to produce dark-subtracted images. Each Run should
+have at least one ``'dark'`` Event, and it may have more than one if a
+fresh dark frame is needed mid-run. The most direct way to achieve this is to
+write ``trigger_and_read(..., name='dark')`` into a custom plan:
+
+.. code:: python
+
+   import bluesky.plan_stubs as bps
+
+   def count_with_darkframe(detector, md=None):
+       yield from bps.stage(detector)
+       yield from bps.open_run(md=md)
+       yield from bps.mv(shutter, 'closed')
+       yield from bps.trigger_and_read([detector], name='dark')
+       yield from bps.mv(shutter, 'open')
+       yield from bps.trigger_and_read([detector])  # name='primary' by default
+       yield from bps.close_run()
+       yield from bps.unstage(detector)
+
+This direct solution is best one for some circumstances. However, if you find
+yourself looking at the prospect of rewriting a large number of plans just to
+add this dark frame logic, it may be simpler to use a bluesky *preprocessor*. A
+preprocessor can augment or modify the steps in a plan. The
+:class:`DarkFramePreprocessor` watches for a given detector to be triggered and
+inserts steps in the plan to acquire and/or record a dark frame when needed.
+Depending on how you configure it, it can reuse a given dark frame multiple
+times. Thus, it will not necessarily *acquire* a dark frame for every Run, but
+it will ensure that at least one 'dark' Event is *recorded* in every Run.
+
+The preprocessor can be applied to specific plans, using Python's decorator
+syntax
+
+.. code:: python
+
+   from bluesky.preprocessors import make_decorator
+
+   # Do this just once.
+   dark_frame_preprocessor = ... # See next section.
+   do_dark_frames = make_decorator(dark_frame_preprocessor)()
+
+   # And apply it to as many plans as you like.
+   @do_dark_frames
+   def my_custom_plan(...):
+       ...
+
+   @do_dark_frames
+   def another_custom_plan(...):
+       ...
+
+or it can be applied to *all* plans.
+
+.. code:: python
+
+   # Do this just once.
+   dark_frame_preprocessor = ... # See next section.
+   RE.preprocessors.append(dark_frame_preprocessor)
+
+This enables the user to use any built-in or user-defined plan and know that
+dark frames will automatically be included in the logic of the plan. Note that
+preprocessor will only have an effect is the detector of interest is used
+during the plan.
 
 Initial Configuration
 =====================
