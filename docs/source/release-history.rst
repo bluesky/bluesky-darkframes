@@ -2,6 +2,15 @@
 Release History
 ===============
 
+v0.4.0 (2019-12-07)
+-------------------
+
+Version v0.2.0 introduced a ``pedestal`` parameter in
+:class:`~bluesky_darkframes.DarkSubtraction` to help avoid overflow
+wrap-around. The *documented* default value was ``100`` but the *actual*
+default in the code was ``0``. The actual default has been changed to ``100``
+to match the documentation.
+
 v0.3.0 (2019-08-15)
 -------------------
 
