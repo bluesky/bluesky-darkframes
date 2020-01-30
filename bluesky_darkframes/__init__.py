@@ -303,6 +303,7 @@ class DarkSubtraction(event_model.DocumentRouter):
         if doc['name'] == self.light_stream_name:
             self.light_descriptor = doc['uid']
             # add flag that we did the background subtraction
+            doc = copy.deepcopy(dict(doc))
             doc['data_keys'][f'{self.field}_is_background_subtracted'] = {
                 'dtype': 'number',
                 'shape': [],
