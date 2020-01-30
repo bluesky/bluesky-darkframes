@@ -305,6 +305,7 @@ class DarkSubtraction(event_model.DocumentRouter):
             # add flag that we did the background subtraction
             doc = copy.deepcopy(dict(doc))
             doc['data_keys'][f'{self.field}_is_background_subtracted'] = {
+                'source': 'DarkSubtraction',
                 'dtype': 'number',
                 'shape': [],
                 'precsion': 0,
@@ -314,6 +315,7 @@ class DarkSubtraction(event_model.DocumentRouter):
                 'timestamp': {'pedestal': time.time()},
                 'data_keys': {
                     'pedestal': {
+                        'source': 'DarkSubtraction',
                         'dtype': 'number',
                         'shape': [],
                         'precsion': 0,
