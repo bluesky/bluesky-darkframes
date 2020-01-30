@@ -327,7 +327,7 @@ class DarkSubtraction(event_model.DocumentRouter):
 
         elif doc['name'] == self.dark_stream_name:
             self.dark_descriptor = doc['uid']
-        return super().descriptor(doc)
+        return doc
 
     def event_page(self, doc):
         if doc['descriptor'] == self.dark_descriptor:
@@ -345,7 +345,7 @@ class DarkSubtraction(event_model.DocumentRouter):
             doc['data'][self.field] = subtracted
             doc['data'][f'{self.field}_is_background_subtracted'] = [True]
             doc['timestamps'][f'{self.field}_is_background_subtracted'] = [time.time()]
-        return super().event_page(doc)
+        return doc
 
     def subtract(self, light, dark):
         return numpy.clip(light - dark, a_min=0, a_max=None).astype(light.dtype)
