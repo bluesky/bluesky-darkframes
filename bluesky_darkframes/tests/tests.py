@@ -17,11 +17,11 @@ det.exposure_time.put(0.01)
 shutter = bluesky_darkframes.sim.Shutter(name='shutter', value='open')
 
 
-def dark_plan():
+def dark_plan(detector):
     yield from bps.mv(shutter, 'closed')
-    yield from bps.trigger(det, group='darkframe-trigger')
+    yield from bps.trigger(detector, group='darkframe-trigger')
     yield from bps.wait('darkframe-trigger')
-    snapshot = bluesky_darkframes.SnapshotDevice(det)
+    snapshot = bluesky_darkframes.SnapshotDevice(detector)
     yield from bps.mv(shutter, 'open')
     return snapshot
 

@@ -97,7 +97,7 @@ class DarkFramePreprocessor:
     Parameters
     ----------
     dark_plan: callable
-        Expected siganture: ``dark_plan() -> snapshot_device``
+        Expected siganture: ``dark_plan(detector) -> snapshot_device``
     detector : Device
     max_age: float
         Time after which a fresh dark frame should be acquired
@@ -209,7 +209,7 @@ class DarkFramePreprocessor:
                 snapshot = self.get_snapshot(state)
             except NoMatchingSnapshot:
                 logger.info(f"Taking a new dark frame for state=%r", state)
-                snapshot = yield from self.dark_plan()
+                snapshot = yield from self.dark_plan(self.detector)
                 self.add_snapshot(snapshot, state)
             if snapshot_changed or force_read:
                 logger.info(f"Creating a 'dark' Event for state=%r", state)
