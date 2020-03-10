@@ -208,11 +208,11 @@ class DarkFramePreprocessor:
             try:
                 snapshot = self.get_snapshot(state)
             except NoMatchingSnapshot:
-                logger.info(f"Taking a new dark frame for state=%r", state)
+                logger.info("Taking a new dark frame for state=%r", state)
                 snapshot = yield from self.dark_plan(self.detector)
                 self.add_snapshot(snapshot, state)
             if snapshot_changed or force_read:
-                logger.info(f"Creating a 'dark' Event for state=%r", state)
+                logger.info("Creating a 'dark' Event for state=%r", state)
                 self._current_snapshot.set_snaphsot(snapshot)
                 # Read the Snapshot into the 'dark' Event stream.
                 yield from bps.stage(self._current_snapshot)
