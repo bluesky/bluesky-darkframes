@@ -13,6 +13,8 @@ env:
 
 
 install:
+  # explicitly upgrade numpy to work around a problem with imagecodecs
+  - pip install --upgrade numpy
   # Install this package and the packages listed in requirements.txt.
   - pip install .
   # Install extra requirements for running tests and building docs.
