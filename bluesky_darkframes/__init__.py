@@ -303,16 +303,19 @@ class DarkSubtraction(event_model.DocumentRouter):
         if doc['name'] == self.light_stream_name:
             self.light_descriptor = doc['uid']
             # add flag that we did the background subtraction
+            doc = copy.deepcopy(dict(doc))
             doc['data_keys'][f'{self.field}_is_background_subtracted'] = {
+                'source': 'DarkSubtraction',
                 'dtype': 'number',
                 'shape': [],
                 'precsion': 0,
                 'object_name': f'{self.field}_DarkSubtraction'}
             doc['configuration'][f'{self.field}_DarkSubtraction'] = {
                 'data': {'pedestal': self.pedestal},
-                'timestamp': {'pedestal': time.time()},
+                'timestamps': {'pedestal': time.time()},
                 'data_keys': {
                     'pedestal': {
+                        'source': 'DarkSubtraction',
                         'dtype': 'number',
                         'shape': [],
                         'precsion': 0,
@@ -324,7 +327,7 @@ class DarkSubtraction(event_model.DocumentRouter):
 
         elif doc['name'] == self.dark_stream_name:
             self.dark_descriptor = doc['uid']
-        return super().descriptor(doc)
+        return doc
 
     def event_page(self, doc):
         if doc['descriptor'] == self.dark_descriptor:
@@ -342,7 +345,7 @@ class DarkSubtraction(event_model.DocumentRouter):
             doc['data'][self.field] = subtracted
             doc['data'][f'{self.field}_is_background_subtracted'] = [True]
             doc['timestamps'][f'{self.field}_is_background_subtracted'] = [time.time()]
-        return super().event_page(doc)
+        return doc
 
     def subtract(self, light, dark):
         return numpy.clip(light - dark, a_min=0, a_max=None).astype(light.dtype)
