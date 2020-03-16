@@ -227,7 +227,7 @@ class DarkFramePreprocessor:
 
     def _evict_old_entries(self):
         now = time.monotonic()
-        for key, (creation_time, snapshot) in list(self._cache.items()):
+        for key, (creation_time, _snapshot) in list(self._cache.items()):
             if now - creation_time > self.max_age:
                 logger.debug("Evicted old snapshot for state %r", key)
                 # Too old. Evict from cache.
