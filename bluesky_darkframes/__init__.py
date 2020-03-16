@@ -2,6 +2,7 @@ import collections
 import copy
 import logging
 import time
+import uuid
 
 import event_model
 from frozendict import frozendict
@@ -33,8 +34,8 @@ class SnapshotDevice(Device):
         self._describe_configuration = device.describe_configuration()
         self._read = device.read()
         self._read_configuration = device.read_configuration()
-        self._read_attrs = list(device.read())
-        self._configuration_attrs = list(device.read_configuration())
+        self._read_attrs = list(self._read)
+        self._configuration_attrs = list(self._read_configuration)
         self._asset_docs_cache = list(device.collect_asset_docs())
         self._assets_collected = False
 
@@ -69,6 +70,55 @@ class SnapshotDevice(Device):
 
     def stage(self):
         self._assets_collected = False
+        return super().stage()
+
+    def unstage(self):
+        self._remake_docs()
+        return super().unstage()
+
+
+    def _remake_docs(self):
+        """
+        Avoid re-emitting documents with the same unique identifiers.
+
+        - Make shallow copies of Resource and Datum docs with new unique identifiers.
+        - Update the return value of read() with the new datum_ids.
+        """
+        resources = {}  # map old uid to new uid
+        new_asset_docs_cache = []
+        for name, doc in self._asset_docs_cache:
+            if name == 'resource':
+                new_uid = str(uuid.uuid4())
+                resources[doc['uid']] = new_uid
+                new_doc = doc.copy()
+                new_doc['uid'] = new_uid
+                new_asset_docs_cache.append((name, new_doc))
+            elif name == 'datum':
+                new_doc = doc.copy()
+                old_resource_uid = doc['resource']
+                new_resource_uid = resources[old_resource_uid]
+                new_doc['resource'] = new_resource_uid
+                # Some existing code in other libraries looks for the
+                # {resource_uid}/{integer} pattern in Event documents and uses that
+                # to take a fast path. The changes to Datum proposed in
+                # https://github.com/bluesky/event-model/issues/156
+                # would make this less fragile.
+                old_datum_id = doc['datum_id']
+                if old_datum_id.startswith(f"{old_resource_uid}/"):
+                    _, suffix = old_datum_id.split('/', 1)
+                    new_datum_id = f"{new_resource_uid}/{suffix}"
+                else:
+                    new_datum_id = str(uuid.uuid4())
+                new_doc['datum_id'] = new_datum_id
+                new_asset_docs_cache.append((name, new_doc))
+                # Update the return value of read() to replace the old datum_id
+                # with the new one.
+                for k, v in list(self._read.items()):
+                    if v['value'] == old_datum_id:
+                        self._read[k]['value'] = new_datum_id
+            else:
+                raise BlueskyDarkframesValueError(f"Unexpected name {name}")
+        self._asset_docs_cache = new_asset_docs_cache
 
 
 class _SnapshotShell:
