@@ -195,11 +195,6 @@ def test_streaming_export(RE, tmp_path, pedestal):
         serializer = Serializer(tmp_path)
         filler = Filler({'NPY_SEQ': NumpySeqHandler}, inplace=False)
 
-        # Here we push the run 'start' doc through.
-        subtractor(name, doc)
-        serializer(name, doc)
-        filler(name, doc)
-
         # And by returning this function below, we are routing all other
         # documents *for this run* through here.
         def fill_subtract_and_serialize(name, doc):
@@ -233,11 +228,6 @@ def test_no_dark_frames(RE, tmp_path):
         subtractor = bluesky_darkframes.DarkSubtraction('det_image')
         serializer = Serializer(tmp_path)
         filler = Filler({'NPY_SEQ': NumpySeqHandler}, inplace=False)
-
-        # Here we push the run 'start' doc through.
-        subtractor(name, doc)
-        serializer(name, doc)
-        filler(name, doc)
 
         # And by returning this function below, we are routing all other
         # documents *for this run* through here.

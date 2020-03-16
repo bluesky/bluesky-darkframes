@@ -1,4 +1,4 @@
 bluesky
-event-model >=1.13.2
+event-model >=1.14.0
 frozendict
 numpy
