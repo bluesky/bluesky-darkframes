@@ -5,7 +5,7 @@ import bluesky.plan_stubs as bps
 import bluesky_darkframes
 import bluesky_darkframes.sim
 from bluesky.plans import count
-from event_model import RunRouter, Filler
+from event_model import RunRouter
 from ophyd.sim import NumpySeqHandler
 import pytest
 from suitcase.tiff_series import Serializer
@@ -193,18 +193,16 @@ def test_streaming_export(RE, tmp_path, pedestal):
             kwargs['pedestal'] = pedestal
         subtractor = bluesky_darkframes.DarkSubtraction('det_image', **kwargs)
         serializer = Serializer(tmp_path)
-        filler = Filler({'NPY_SEQ': NumpySeqHandler}, inplace=False)
 
         # And by returning this function below, we are routing all other
         # documents *for this run* through here.
-        def fill_subtract_and_serialize(name, doc):
-            name, doc = filler(name, doc)
+        def subtract_and_serialize(name, doc):
             name, doc = subtractor(name, doc)
             serializer(name, doc)
 
-        return [fill_subtract_and_serialize], []
+        return [subtract_and_serialize], []
 
-    rr = RunRouter([factory])
+    rr = RunRouter([factory], {'NPY_SEQ': NumpySeqHandler})
     RE.subscribe(rr)
 
     dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
@@ -227,18 +225,16 @@ def test_no_dark_frames(RE, tmp_path):
         # and then tearing it down when we're done with this run.
         subtractor = bluesky_darkframes.DarkSubtraction('det_image')
         serializer = Serializer(tmp_path)
-        filler = Filler({'NPY_SEQ': NumpySeqHandler}, inplace=False)
 
         # And by returning this function below, we are routing all other
         # documents *for this run* through here.
-        def fill_subtract_and_serialize(name, doc):
-            name, doc = filler(name, doc)
+        def subtract_and_serialize(name, doc):
             name, doc = subtractor(name, doc)
             serializer(name, doc)
 
-        return [fill_subtract_and_serialize], []
+        return [subtract_and_serialize], []
 
-    rr = RunRouter([factory])
+    rr = RunRouter([factory], {'NPY_SEQ': NumpySeqHandler})
     RE.subscribe(rr)
 
     # We intentionally 'forget' to set up a dark_frame_preprocessor for this
