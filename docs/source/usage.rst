@@ -110,8 +110,10 @@ for whether/how dark frames can be reused.)
        yield from bps.unstage(detector)
        yield from bps.stage(detector)
        yield from bps.mv(shutter, 'closed')
-       yield from bps.trigger(detector, group='darkframe-trigger')
-       yield from bps.wait('darkframe-trigger')
+       # The `group` parameter passed to trigger MUST start with
+       # bluesky-darkframes-trigger.
+       yield from bps.trigger(detector, group='bluesky-darkframes-trigger')
+       yield from bps.wait('bluesky-darkframes-trigger')
        snapshot = bluesky_darkframes.SnapshotDevice(detector)
        yield from bps.mv(shutter, 'open')
        # Restage.

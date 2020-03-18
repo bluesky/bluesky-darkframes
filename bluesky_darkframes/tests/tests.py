@@ -21,7 +21,7 @@ def dark_plan(detector):
     yield from bps.unstage(detector)
     yield from bps.mv(shutter, 'closed')
     yield from bps.stage(detector)
-    yield from bps.trigger(detector, group='darkframe-trigger')
+    yield from bps.trigger(detector, group='bluesky-darkframes-trigger')
     yield from bps.wait('darkframe-trigger')
     snapshot = bluesky_darkframes.SnapshotDevice(detector)
     yield from bps.unstage(detector)
@@ -277,3 +277,19 @@ def test_no_dark_frames(RE, tmp_path):
 
     with pytest.raises(bluesky_darkframes.NoDarkFrame):
         RE(count([det]))
+
+
+def test_nested_preprocessors(RE):
+    N = 3
+    for i in range(N):
+        dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
+            dark_plan=dark_plan, detector=det, max_age=0,
+            stream_name=f'dark_{i}')
+        RE.preprocessors.append(dark_frame_preprocessor)
+
+    def verify_event_count(name, doc):
+        if name == 'stop':
+            for i in range(N):
+                assert doc['num_events'][f'dark_{i}'] == 3
+
+    RE(count([det], 3), verify_event_count)
