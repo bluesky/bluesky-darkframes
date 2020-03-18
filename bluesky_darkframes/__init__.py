@@ -126,7 +126,6 @@ class DarkFramePreprocessor:
         # Map state to (creation_time, snapshot).
         self._cache = collections.OrderedDict()
         self._current_snapshot = _SnapshotShell()
-        self._current_state = None
         self._force_read_before_next_event = True
         self._latch = False
         self._disabled = False
@@ -204,17 +203,14 @@ class DarkFramePreprocessor:
                 # into (('data_key', <value>) ...).
                 values_only = tuple((k, v['value']) for k, v in reading.items())
                 state[signal.name] = values_only
-            if self._current_state != state:
-                self._current_state = state
-                snapshot_changed = True
-            else:
-                snapshot_changed = False
             try:
                 snapshot = self.get_snapshot(state)
+                snapshot_changed = False
             except NoMatchingSnapshot:
                 logger.info("Taking a new dark frame for state=%r", state)
                 snapshot = yield from self.dark_plan(self.detector)
                 self.add_snapshot(snapshot, state)
+                snapshot_changed = True
             if snapshot_changed or force_read:
                 logger.info("Creating a 'dark' Event for state=%r", state)
                 self._current_snapshot.set_snaphsot(snapshot)
