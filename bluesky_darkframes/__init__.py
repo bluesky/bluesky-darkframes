@@ -81,6 +81,9 @@ class _SnapshotShell:
     def set_snaphsot(self, snapshot):
         self.__snapshot = snapshot
 
+    def get_snapshot(self):
+        return self.__snapshot
+
     def __getattr__(self, key):
         return getattr(self.__snapshot, key)
 
@@ -103,7 +106,8 @@ class DarkFramePreprocessor:
         Time after which a fresh dark frame should be acquired
     locked_signals: Iterable, optional
         Any changes to these signals invalidate the current dark frame and
-        prompt us to take a new one.
+        prompt us to take a new one. Typical examples would be exposure time or
+        gain, anything that changes the expected dark frame.
     limit: integer or None, optional
         Number of dark frames to cache. If None, do not limit.
     stream_name: string, optional
@@ -144,8 +148,8 @@ class DarkFramePreprocessor:
         snapshot is a :class:`SnapshotDevice` instance.
 
         The cache is ordered. When an item is accessed, it is moved to the
-        front. If limit is set, items will be removed from the end as needed to
-        abide by the limit.
+        front. If ``limit`` is set, items will be removed from the end as
+        needed to abide by the limit.
 
         Whenver the cache is updated or accessed, any items whose
         ``creation_time`` is more than ``max_age`` seconds ago are culled.
@@ -161,7 +165,8 @@ class DarkFramePreprocessor:
         snapshot: SnapshotDevice
         state: dict, optional
             Mapping each of the names of the locked_signals (if any) to its
-            value when the snapshot was taken.
+            value when the snapshot was taken. When snapshots are accessed via
+            ``get_snapshot(state)``, the states will be compared via ``==``.
         """
         logger.debug("Captured snapshot for state %r", state)
         state = state or {}
@@ -210,7 +215,9 @@ class DarkFramePreprocessor:
         """
         Preprocessor: Takes in a plan and creates a modified plan.
 
-        This inserts messages to add extra readings to the plan.
+        This inserts messages to add extra readings to the plan. First, it
+        decides whether it needs to trigger the detector to get a fresh reading
+        or whether it can use a cached reading.
         """
 
         if self._disabled:
@@ -229,18 +236,31 @@ class DarkFramePreprocessor:
                 state[signal.name] = values_only
             try:
                 snapshot = self.get_snapshot(state)
-                snapshot_changed = False
             except NoMatchingSnapshot:
+                # If we are here, we either haven't taken a reading when the
+                # locked_signals were in this state, or the last such reading
+                # we took has aged out of the cache. We have to trigger the
+                # hardware and get a fresh snapshot.
                 logger.info("Taking a new %r reading for state=%r",
                             self.stream_name, state)
                 snapshot = yield from self.dark_plan(self.detector)
                 self.add_snapshot(snapshot, state)
-                snapshot_changed = True
+            # If the Snapshot is the same as the one we most recently inserted,
+            # then we don't need to create a new Event. The previous Event
+            # still holds.
+            snapshot_changed = snapshot is not self._current_snapshot.get_snapshot()
             if snapshot_changed or force_read:
                 logger.info("Creating a %r Event for state=%r",
                             self.stream_name, state)
                 self._current_snapshot.set_snaphsot(snapshot)
-                # Read the Snapshot into the 'dark' Event stream.
+                # Read the Snapshot. This does not actually trigger hardware,
+                # but it goes through all the bluesky steps to generate new
+                # Event.
+                # The reason we handle self._current_snapshot here instead of
+                # snapshot itself is the bluesky RunEngine notices if you give
+                # it a different object than you had given it earlier. Thus,
+                # bluesky will always see the "Device" self._current_snapshot
+                # here, and it will be satisfied.
                 yield from bps.stage(self._current_snapshot)
                 yield from bps.trigger_and_read([self._current_snapshot],
                                                 name=self.stream_name)
@@ -256,6 +276,8 @@ class DarkFramePreprocessor:
                 self._latch = True
                 return insert_dark_frame(force_read=force_read, msg=msg), None
             elif msg.command == 'open_run':
+                # Make sure we get a new Event because we have just started a
+                # new Run.
                 self._force_read_before_next_event = True
                 return None, None
             else:
