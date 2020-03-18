@@ -8,6 +8,7 @@ import event_model
 from frozendict import frozendict
 import bluesky.preprocessors
 import bluesky.plan_stubs as bps
+from bluesky.utils import short_uid
 import numpy
 from ophyd import Device
 
@@ -136,6 +137,9 @@ class _SnapshotShell:
 
     def __getattr__(self, key):
         return getattr(self.__snapshot, key)
+
+
+GROUP_PREFIX = 'bluesky-darkframes-trigger'
 
 
 class DarkFramePreprocessor:
@@ -312,18 +316,29 @@ class DarkFramePreprocessor:
                 # bluesky will always see the "Device" self._current_snapshot
                 # here, and it will be satisfied.
                 yield from bps.stage(self._current_snapshot)
-                yield from bps.trigger_and_read([self._current_snapshot],
-                                                name=self.stream_name)
+                yield from trigger_and_read(
+                    [self._current_snapshot],
+                    name=self.stream_name,
+                    group=short_uid(GROUP_PREFIX))
                 yield from bps.unstage(self._current_snapshot)
             self._latch = False
             if msg is not None:
                 return (yield msg)
 
         def maybe_insert_dark_frame(msg):
-            if msg.command == 'trigger' and msg.obj is self.detector and not self._latch:
+            # * Is this a 'trigger' message?
+            # * Does it refer to the detector that this preprocessor cares about?
+            # * Is it *not* from another DarkFramePreprocessor. (There can be
+            # multiple nested DarkFramePreprocessors watching the same detector
+            # by applying different dark_plans / recording Events in different
+            # streams.)
+            if (msg.command == 'trigger'
+                    and msg.obj is self.detector
+                    and not msg.kwargs['group'].startswith(GROUP_PREFIX)
+                    and not self._latch):
                 force_read = self._force_read_before_next_event
                 self._force_read_before_next_event = False
-                self._latch = True
+                self._latch = True  # prevents infinite recursion
                 return insert_dark_frame(force_read=force_read, msg=msg), None
             elif msg.command == 'open_run':
                 # Make sure we get a new Event because we have just started a
@@ -486,3 +501,56 @@ class NoDarkFrame(RuntimeError, BlueskyDarkframesException):
 
 class NoMatchingSnapshot(KeyError, BlueskyDarkframesException):
     ...
+
+
+# Vendored from bluesky.plan_stubs, added `group` parameter
+
+
+def trigger_and_read(devices, name='primary', group=None):
+    """
+    Trigger and read a list of detectors and bundle readings into one Event.
+
+    Parameters
+    ----------
+    devices : iterable
+        devices to trigger (if they have a trigger method) and then read
+    name : string, optional
+        event stream name, a convenient human-friendly identifier; default
+        name is 'primary'
+    group : string (or any hashable object), optional
+        identifier used by 'trigger' and 'wait'
+
+    Yields
+    ------
+    msg : Msg
+        messages to 'trigger', 'wait' and 'read'
+    """
+    # If devices is empty, don't emit 'create'/'save' messages.
+    if not devices:
+        yield from bps.null()
+    devices = bps.separate_devices(devices)  # remove redundant entries
+    rewindable = bps.all_safe_rewind(devices)  # if devices can be re-triggered
+
+    def inner_trigger_and_read():
+        nonlocal group
+        if group is None:
+            group = short_uid('trigger')
+        no_wait = True
+        for obj in devices:
+            if hasattr(obj, 'trigger'):
+                no_wait = False
+                yield from bps.trigger(obj, group=group)
+        # Skip 'wait' if none of the devices implemented a trigger method.
+        if not no_wait:
+            yield from bps.wait(group=group)
+        yield from bps.create(name)
+        ret = {}  # collect and return readings to give plan access to them
+        for obj in devices:
+            reading = (yield from bps.read(obj))
+            if reading is not None:
+                ret.update(reading)
+        yield from bps.save()
+        return ret
+    from bluesky.preprocessors import rewindable_wrapper
+    return (yield from rewindable_wrapper(inner_trigger_and_read(),
+                                          rewindable))
