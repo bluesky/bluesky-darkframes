@@ -76,7 +76,6 @@ class SnapshotDevice(Device):
         self._remake_docs()
         return super().unstage()
 
-
     def _remake_docs(self):
         """
         Avoid re-emitting documents with the same unique identifiers.
