@@ -66,6 +66,7 @@ class SnapshotDevice(Device):
         if self._assets_collected:
             yield from []
         else:
+            self._assets_collected = True
             yield from self._asset_docs_cache
 
     def stage(self):
