@@ -39,6 +39,19 @@ def test_one_dark_event_emitted(RE):
     RE(count([det], 3), verify_one_dark_frame)
 
 
+def test_disable(RE):
+    dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
+        dark_plan=dark_plan, detector=det, max_age=3)
+    RE.preprocessors.append(dark_frame_preprocessor)
+    dark_frame_preprocessor.disable()
+
+    def verify_no_dark_stream(name, doc):
+        if name == 'stop':
+            assert 'dark' not in doc['num_events']
+
+    RE(count([det]), verify_no_dark_stream)
+
+
 def test_mid_scan_dark_frames(RE):
     dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
         dark_plan=dark_plan, detector=det, max_age=0)
