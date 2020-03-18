@@ -211,6 +211,7 @@ def test_non_colliding_uids(RE):
 
     RE(count([det]), check_uniqueness)
     RE(count([det]), check_uniqueness)
+    RE(count([det]), check_uniqueness)
 
 
 @pytest.mark.parametrize('pedestal', [None, 0, 100])
