@@ -2,14 +2,66 @@
 Release History
 ===============
 
-v0.4.0 (2019-12-07)
+v0.4.0 (2019-03-18)
 -------------------
 
-Version v0.2.0 introduced a ``pedestal`` parameter in
-:class:`~bluesky_darkframes.DarkSubtraction` to help avoid overflow
-wrap-around. The *documented* default value was ``100`` but the *actual*
-default in the code was ``0``. The actual default has been changed to ``100``
-to match the documentation.
+Added
+-----
+* The :class:`~bluesky_darkframes.DarkFrameProcessor` has new methods
+  :meth:`~bluesky_darkframes.DarkFrameProcessor.disable` and
+  :meth:`~bluesky_darkframes.DarkFrameProcessor.enable` to conveniently turn
+  it off and on interactively.
+
+Fixed
+-----
+
+* It is now possible to have multiple
+  :class:`~bluesky_darkframes.DarkFrameProcessor` instances watching the same
+  detector with different ``dark_plan`` and ``stream_name`` parameters.
+  Previously, these would interact badly and raise errors.
+* When the same Snapshot is used multiple times, fresh unique identifiers are
+  assigned to the Resource and Datum documents before they are reissued. That
+  is, we never issue a document with a given unique ID more than once, even if
+  the content is the same.
+
+Changed
+-------
+
+* The ``dark_plan`` passed to :class:`~bluesky_darkframes.DarkFrameProcessor`
+  is now expected to accept a ``detector`` argument. Previously the
+  ``dark_plan`` referred to a specific detector instance in its body, as in:
+
+  .. code:: python
+
+     def dark_plan():
+         # Do stuff with some_detector.
+         ...
+
+     dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
+          dark_plan=dark_plan, detector=some_detector)
+
+  Now, the ``dark_plan`` can be written to accept a generic ``detector``
+  argument, and  :class:`~bluesky_darkframes.DarkFrameProcessor` will pass
+  ``some_detector`` in, as in:
+
+  .. code:: python
+
+     def dark_plan(detector):
+         # Do stuff with detector.
+         ...
+
+     dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
+          dark_plan=dark_plan, detector=some_detector)
+
+  The old signature ``dark_plan()`` is still supported for
+  backward-compatbility, but a warning will be issued that this will not be
+  supported in a future release.
+
+* Version v0.2.0 introduced a ``pedestal`` parameter in
+  :class:`~bluesky_darkframes.DarkSubtraction` to help avoid overflow
+  wrap-around. The *documented* default value was ``100`` but the *actual*
+  default in the code was ``0``. The actual default has been changed to ``100``
+  to match the documentation.
 
 v0.3.0 (2019-08-15)
 -------------------
