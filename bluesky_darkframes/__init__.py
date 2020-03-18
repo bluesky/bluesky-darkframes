@@ -191,6 +191,7 @@ class DarkFramePreprocessor:
         "Preprocessor: Takes in a plan and creates a modified plan."
 
         if self._disabled:
+            logger.info("%r is disabled, will act as a no-op", self)
             return (yield from plan)
 
         def insert_dark_frame(force_read, msg=None):
