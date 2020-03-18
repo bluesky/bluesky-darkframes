@@ -33,7 +33,7 @@ def test_one_dark_event_emitted(RE):
 
     def verify_one_dark_frame(name, doc):
         if name == 'stop':
-            doc['num_events']['dark'] == 1
+            assert doc['num_events']['dark'] == 1
 
     RE(count([det]), verify_one_dark_frame)
     RE(count([det], 3), verify_one_dark_frame)
@@ -46,7 +46,7 @@ def test_mid_scan_dark_frames(RE):
 
     def verify_four_dark_frames(name, doc):
         if name == 'stop':
-            doc['num_events']['dark'] == 4
+            assert doc['num_events']['dark'] == 4
 
     RE(count([det], 3), verify_four_dark_frames)
 
