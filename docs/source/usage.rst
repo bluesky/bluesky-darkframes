@@ -106,11 +106,17 @@ for whether/how dark frames can be reused.)
    shutter = Shutter(name='shutter', value='open')
 
    def dark_plan(detector):
+       # Restage to ensure that dark frames goes into a separate file.
+       yield from bps.unstage(detector)
+       yield from bps.stage(detector)
        yield from bps.mv(shutter, 'closed')
        yield from bps.trigger(detector, group='darkframe-trigger')
        yield from bps.wait('darkframe-trigger')
        snapshot = bluesky_darkframes.SnapshotDevice(detector)
        yield from bps.mv(shutter, 'open')
+       # Restage.
+       yield from bps.unstage(detector)
+       yield from bps.stage(detector)
        return snapshot
 
 This is boilerplate bluesky and databroker setup not specificially related to
@@ -237,7 +243,7 @@ Here we use a :class:`event_model.RunRouter`.
 .. jupyter-execute::
 
    from bluesky_darkframes import DarkSubtraction
-   from event_model import RunRouter, Filler
+   from event_model import RunRouter
    from suitcase.tiff_series import Serializer
 
    def factory(name, doc):
@@ -246,23 +252,16 @@ Here we use a :class:`event_model.RunRouter`.
        # and then tearing it down when we're done with this run.
        subtractor = DarkSubtraction('det_image')
        serializer = Serializer('live_exported_files/')
-       filler = Filler(db.reg.handler_reg, inplace=False)
-
-       # Here we push the run 'start' doc through.
-       subtractor(name, doc)
-       serializer(name, doc)
-       filler(name, doc)
 
        # And by returning this function below, we are routing all other
        # documents *for this run* through here.
-       def fill_subtract_and_serialize(name, doc):
-           name, doc = filler(name, doc)
+       def subtract_and_serialize(name, doc):
            name, doc = subtractor(name, doc)
            serializer(name, doc)
 
-       return [fill_subtract_and_serialize], []
+       return [subtract_and_serialize], []
 
-   rr = RunRouter([factory])
+   rr = RunRouter([factory], db.reg.handler_reg)
    RE.subscribe(rr);
 
 Now take some data.
