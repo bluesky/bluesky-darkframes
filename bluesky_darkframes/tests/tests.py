@@ -107,6 +107,47 @@ def test_locked_signals(RE):
     assert len(dark_frame_preprocessor.cache) == 2
 
 
+def test_locked_signals_event_output(RE):
+    """
+    Changing the locked_signals (e.g. exposure time) and then changing them
+    back should cause a new dark *Event* to be emitted each time but it should
+    only require actually *triggering* to get a new snapshot twice.
+
+    That is, if we change the state of the locked_signals like A -> B -> A, we
+    only need one snapshot for A and one snapshot for B, but there will be two
+    Events containing the reading from A.
+    """
+    dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
+        dark_plan=dark_plan, detector=det, max_age=100,
+        locked_signals=[det.exposure_time])
+    RE.preprocessors.append(dark_frame_preprocessor)
+
+    def plan():
+        yield from bps.open_run()
+        yield from bps.stage(det)
+        yield from bps.mv(det.exposure_time, 0.01)
+        yield from bps.trigger_and_read([det])  # should prompt new dark Event
+        yield from bps.trigger_and_read([det])
+        yield from bps.mv(det.exposure_time, 0.02)
+        yield from bps.trigger_and_read([det])  # should prompt new dark Event
+        yield from bps.trigger_and_read([det])
+        yield from bps.mv(det.exposure_time, 0.01)
+        yield from bps.trigger_and_read([det])  # should prompt new dark Event
+        yield from bps.trigger_and_read([det])
+        yield from bps.trigger_and_read([det])
+        yield from bps.unstage(det)
+        yield from bps.close_run()
+
+    def verify_event_count(name, doc):
+        if name == 'stop':
+            assert doc['num_events']['dark'] == 3
+            assert doc['num_events']['primary'] == 7
+
+    RE(plan(), verify_event_count)
+
+    assert len(dark_frame_preprocessor.cache) == 2
+
+
 def test_limit(RE):
     """
     Test that if a 'locked signal' is changed, a new dark frame is taken, but
