@@ -134,6 +134,21 @@ class DarkFramePreprocessor:
     def cache(self):
         """
         A read-only view of the cached dark frames.
+
+        Each key is a frozendict mapping each of the names of the
+        ``locked_signals`` (if any) to its value at the time the dark frame was
+        taken.
+
+        Each value has the structure ``(creation_time, snapshot)`` where
+        creation_time is the UNIX epoch time that the dark frame was taken and
+        snapshot is a :class:`SnapshotDevice` instance.
+
+        The cache is ordered. When an item is accessed, it is moved to the
+        front. If limit is set, items will be removed from the end as needed to
+        abide by the limit.
+
+        Whenver the cache is updated or accessed, any items whose
+        ``creation_time`` is more than ``max_age`` seconds ago are culled.
         """
         return self._cache
 
@@ -145,6 +160,8 @@ class DarkFramePreprocessor:
         ----------
         snapshot: SnapshotDevice
         state: dict, optional
+            Mapping each of the names of the locked_signals (if any) to its
+            value when the snapshot was taken.
         """
         logger.debug("Captured snapshot for state %r", state)
         state = state or {}
@@ -168,6 +185,8 @@ class DarkFramePreprocessor:
         Parameters
         ----------
         state: dict
+            Mapping each of the names of the locked_signals (if any) to its
+            value.
         """
         self._evict_old_entries()
         key = frozendict(state)
@@ -188,7 +207,11 @@ class DarkFramePreprocessor:
         self._cache.clear()
 
     def __call__(self, plan):
-        "Preprocessor: Takes in a plan and creates a modified plan."
+        """
+        Preprocessor: Takes in a plan and creates a modified plan.
+
+        This inserts messages to add extra readings to the plan.
+        """
 
         if self._disabled:
             logger.info("%r is disabled, will act as a no-op", self)
@@ -208,12 +231,14 @@ class DarkFramePreprocessor:
                 snapshot = self.get_snapshot(state)
                 snapshot_changed = False
             except NoMatchingSnapshot:
-                logger.info("Taking a new dark frame for state=%r", state)
+                logger.info("Taking a new %r reading for state=%r",
+                            self.stream_name, state)
                 snapshot = yield from self.dark_plan(self.detector)
                 self.add_snapshot(snapshot, state)
                 snapshot_changed = True
             if snapshot_changed or force_read:
-                logger.info("Creating a 'dark' Event for state=%r", state)
+                logger.info("Creating a %r Event for state=%r",
+                            self.stream_name, state)
                 self._current_snapshot.set_snaphsot(snapshot)
                 # Read the Snapshot into the 'dark' Event stream.
                 yield from bps.stage(self._current_snapshot)
