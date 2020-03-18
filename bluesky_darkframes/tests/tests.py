@@ -183,6 +183,35 @@ def test_limit(RE):
     previous_state = state
 
 
+def test_non_colliding_uids(RE):
+    """
+    Test that DarkSubtractor generates files when subscribed to RE.
+    """
+
+    class LocalException(Exception):
+        ...
+
+    cache = set()
+
+    def check_uniqueness(name, doc):
+        if name == 'datum':
+            key = (name, doc['datum_id'])
+        else:
+            key = (name, doc['uid'])
+        if key in cache:
+            raise LocalException(f"Collision {key}")
+        cache.add(key)
+
+    RE.subscribe(check_uniqueness)
+
+    dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
+        dark_plan=dark_plan, detector=det, max_age=100)
+    RE.preprocessors.append(dark_frame_preprocessor)
+
+    RE(count([det]), check_uniqueness)
+    RE(count([det]), check_uniqueness)
+
+
 @pytest.mark.parametrize('pedestal', [None, 0, 100])
 def test_streaming_export(RE, tmp_path, pedestal):
     """
