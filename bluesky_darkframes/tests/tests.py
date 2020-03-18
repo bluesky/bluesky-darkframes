@@ -185,7 +185,8 @@ def test_limit(RE):
 
 def test_non_colliding_uids(RE):
     """
-    Test that DarkSubtractor generates files when subscribed to RE.
+    Tests that when the same Snapshot is used multiple times it issues distinct
+    Resource and Datum documents with non-colliding uids.
     """
 
     class LocalException(Exception):
