@@ -33,10 +33,23 @@ def test_one_dark_event_emitted(RE):
 
     def verify_one_dark_frame(name, doc):
         if name == 'stop':
-            doc['num_events']['dark'] == 1
+            assert doc['num_events']['dark'] == 1
 
     RE(count([det]), verify_one_dark_frame)
     RE(count([det], 3), verify_one_dark_frame)
+
+
+def test_disable(RE):
+    dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
+        dark_plan=dark_plan, detector=det, max_age=3)
+    RE.preprocessors.append(dark_frame_preprocessor)
+    dark_frame_preprocessor.disable()
+
+    def verify_no_dark_stream(name, doc):
+        if name == 'stop':
+            assert 'dark' not in doc['num_events']
+
+    RE(count([det]), verify_no_dark_stream)
 
 
 def test_mid_scan_dark_frames(RE):
@@ -44,11 +57,11 @@ def test_mid_scan_dark_frames(RE):
         dark_plan=dark_plan, detector=det, max_age=0)
     RE.preprocessors.append(dark_frame_preprocessor)
 
-    def verify_four_dark_frames(name, doc):
+    def verify_three_dark_frames(name, doc):
         if name == 'stop':
-            doc['num_events']['dark'] == 4
+            assert doc['num_events']['dark'] == 3
 
-    RE(count([det], 3), verify_four_dark_frames)
+    RE(count([det], 3), verify_three_dark_frames)
 
 
 def test_max_age(RE):
@@ -91,6 +104,47 @@ def test_locked_signals(RE):
     # This should reuse the first one.
     RE(bps.mv(det.exposure_time, 0.01))
     RE(count([det]))
+    assert len(dark_frame_preprocessor.cache) == 2
+
+
+def test_locked_signals_event_output(RE):
+    """
+    Changing the locked_signals (e.g. exposure time) and then changing them
+    back should cause a new dark *Event* to be emitted each time but it should
+    only require actually *triggering* to get a new snapshot twice.
+
+    That is, if we change the state of the locked_signals like A -> B -> A, we
+    only need one snapshot for A and one snapshot for B, but there will be two
+    Events containing the reading from A.
+    """
+    dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
+        dark_plan=dark_plan, detector=det, max_age=100,
+        locked_signals=[det.exposure_time])
+    RE.preprocessors.append(dark_frame_preprocessor)
+
+    def plan():
+        yield from bps.open_run()
+        yield from bps.stage(det)
+        yield from bps.mv(det.exposure_time, 0.01)
+        yield from bps.trigger_and_read([det])  # should prompt new dark Event
+        yield from bps.trigger_and_read([det])
+        yield from bps.mv(det.exposure_time, 0.02)
+        yield from bps.trigger_and_read([det])  # should prompt new dark Event
+        yield from bps.trigger_and_read([det])
+        yield from bps.mv(det.exposure_time, 0.01)
+        yield from bps.trigger_and_read([det])  # should prompt new dark Event
+        yield from bps.trigger_and_read([det])
+        yield from bps.trigger_and_read([det])
+        yield from bps.unstage(det)
+        yield from bps.close_run()
+
+    def verify_event_count(name, doc):
+        if name == 'stop':
+            assert doc['num_events']['dark'] == 3
+            assert doc['num_events']['primary'] == 7
+
+    RE(plan(), verify_event_count)
+
     assert len(dark_frame_preprocessor.cache) == 2
 
 
