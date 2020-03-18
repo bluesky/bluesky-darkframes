@@ -57,11 +57,11 @@ def test_mid_scan_dark_frames(RE):
         dark_plan=dark_plan, detector=det, max_age=0)
     RE.preprocessors.append(dark_frame_preprocessor)
 
-    def verify_four_dark_frames(name, doc):
+    def verify_three_dark_frames(name, doc):
         if name == 'stop':
-            assert doc['num_events']['dark'] == 4
+            assert doc['num_events']['dark'] == 3
 
-    RE(count([det], 3), verify_four_dark_frames)
+    RE(count([det], 3), verify_three_dark_frames)
 
 
 def test_max_age(RE):
