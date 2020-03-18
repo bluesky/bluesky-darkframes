@@ -129,6 +129,7 @@ class DarkFramePreprocessor:
         self._current_state = None
         self._force_read_before_next_event = True
         self._latch = False
+        self._disabled = False
 
     @property
     def cache(self):
@@ -190,6 +191,9 @@ class DarkFramePreprocessor:
     def __call__(self, plan):
         "Preprocessor: Takes in a plan and creates a modified plan."
 
+        if self._disabled:
+            return (yield from plan)
+
         def insert_dark_frame(force_read, msg=None):
             # Acquire a fresh Snapshot if we need one, or retrieve a cached one.
             state = {}
@@ -237,6 +241,29 @@ class DarkFramePreprocessor:
 
         return (yield from bluesky.preprocessors.plan_mutator(
             plan, maybe_insert_dark_frame))
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__} {len(self.cache)} snapshots cached>"
+
+    def disable(self):
+        """
+        Make this preprocessor a no-op.
+
+        See Also
+        --------
+        `DarkFramePreprocessor.enable`
+        """
+        self._disabled = True
+
+    def enable(self):
+        """
+        Counterpart to `diasble()`.
+
+        See Also
+        --------
+        `DarkFramePreprocessor.disable`
+        """
+        self._disabled = False
 
 
 class DarkSubtraction(event_model.DocumentRouter):
