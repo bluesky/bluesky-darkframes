@@ -1,8 +1,11 @@
 import collections
 import copy
+import functools
+import inspect
 import logging
 import time
 import uuid
+import warnings
 
 import event_model
 from frozendict import frozendict
@@ -155,6 +158,9 @@ class DarkFramePreprocessor:
     ----------
     dark_plan: callable
         Expected siganture: ``dark_plan(detector) -> snapshot_device``
+
+        The old signature ``dark_plan() -> snapshot_device`` is accepted but
+        will issue a warning.
     detector : Device
     max_age: float
         Time after which a fresh dark frame should be acquired
@@ -169,8 +175,17 @@ class DarkFramePreprocessor:
     """
     def __init__(self, *, dark_plan, detector, max_age,
                  locked_signals=None, limit=None, stream_name='dark'):
-        self.dark_plan = dark_plan
-        self.detector = detector
+        self._dark_plan = dark_plan
+        if not inspect.signature(dark_plan).parameters:
+            warnings.warn(
+                f"The dark_plan {dark_plan} is now expected to accept the "
+                f"detector as an argument. A dark_plan that accepts no "
+                f"arguments is still supported, but it may not be supported "
+                f"in future releases.")
+            self._partialed_dark_plan = dark_plan
+        else:
+            self._partialed_dark_plan = functools.partial(dark_plan, detector)
+        self._detector = detector
         self.max_age = max_age
         # The signals have to have unique names for this to work.
         names = [signal.name for signal in locked_signals or ()]
@@ -178,7 +193,7 @@ class DarkFramePreprocessor:
             raise BlueskyDarkframesValueError(
                 f"The signals in locked_signals need to have unique names. "
                 f"The names given were: {names}")
-        self.locked_signals = tuple(locked_signals or ())
+        self._locked_signals = tuple(locked_signals or ())
         self._limit = limit
         self.stream_name = stream_name
         # Map state to (creation_time, snapshot).
@@ -187,6 +202,18 @@ class DarkFramePreprocessor:
         self._force_read_before_next_event = True
         self._latch = False
         self._disabled = False
+
+    @property
+    def detector(self):
+        return self._detector
+
+    @property
+    def dark_plan(self):
+        return self._dark_plan
+
+    @property
+    def locked_signals(self):
+        return self._locked_signals
 
     @property
     def cache(self):
@@ -297,7 +324,7 @@ class DarkFramePreprocessor:
                 # hardware and get a fresh snapshot.
                 logger.info("Taking a new %r reading for state=%r",
                             self.stream_name, state)
-                snapshot = yield from self.dark_plan(self.detector)
+                snapshot = yield from self._partialed_dark_plan()
                 self.add_snapshot(snapshot, state)
             # If the Snapshot is the same as the one we most recently inserted,
             # then we don't need to create a new Event. The previous Event

@@ -293,3 +293,27 @@ def test_nested_preprocessors(RE):
                 assert doc['num_events'][f'dark_{i}'] == 3
 
     RE(count([det], 3), verify_event_count)
+
+
+def test_old_dark_plan_signature(RE):
+    """
+    In bluesky-darkfarmes < 0.4.0, we expected dark_plan to take no args.
+    Now, we expect it to accept the detector as an argument.
+
+    Check that the old usage still works, but warns.
+    """
+
+    def old_dark_plan():
+        return (yield from dark_plan(det))
+
+    with pytest.warns(UserWarning, match="dark_plan"):
+        dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
+            dark_plan=old_dark_plan, detector=det, max_age=3)
+    RE.preprocessors.append(dark_frame_preprocessor)
+
+    def verify_one_dark_frame(name, doc):
+        if name == 'stop':
+            assert doc['num_events']['dark'] == 1
+
+    RE(count([det]), verify_one_dark_frame)
+    RE(count([det], 3), verify_one_dark_frame)
