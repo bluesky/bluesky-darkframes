@@ -161,7 +161,7 @@ class DarkFramePreprocessor:
 
         The old signature ``dark_plan() -> snapshot_device`` is accepted but
         will issue a warning.
-    detector : Device
+    detector: Device
     max_age: float
         Time after which a fresh dark frame should be acquired
     locked_signals: Iterable, optional
@@ -387,17 +387,17 @@ class DarkFramePreprocessor:
 
         See Also
         --------
-        `DarkFramePreprocessor.enable`
+        :meth:`DarkFramePreprocessor.enable`
         """
         self._disabled = True
 
     def enable(self):
         """
-        Counterpart to `diasble()`.
+        Counterpart to ``diasble()``.
 
         See Also
         --------
-        `DarkFramePreprocessor.disable`
+        :meth:`DarkFramePreprocessor.disable`
         """
         self._disabled = False
 
