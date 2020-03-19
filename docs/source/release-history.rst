@@ -6,17 +6,17 @@ v0.4.0 (2019-03-18)
 -------------------
 
 Added
------
-* The :class:`~bluesky_darkframes.DarkFrameProcessor` has new methods
-  :meth:`~bluesky_darkframes.DarkFrameProcessor.disable` and
-  :meth:`~bluesky_darkframes.DarkFrameProcessor.enable` to conveniently turn
++++++
+* The :class:`~bluesky_darkframes.DarkFramePreprocessor` has new methods
+  :meth:`~bluesky_darkframes.DarkFramePreprocessor.disable` and
+  :meth:`~bluesky_darkframes.DarkFramePreprocessor.enable` to conveniently turn
   it off and on interactively.
 
 Fixed
------
++++++
 
 * It is now possible to have multiple
-  :class:`~bluesky_darkframes.DarkFrameProcessor` instances watching the same
+  :class:`~bluesky_darkframes.DarkFramePreprocessor` instances watching the same
   detector with different ``dark_plan`` and ``stream_name`` parameters.
   Previously, these would interact badly and raise errors.
 * When the same Snapshot is used multiple times, fresh unique identifiers are
@@ -25,9 +25,9 @@ Fixed
   the content is the same.
 
 Changed
--------
++++++++
 
-* The ``dark_plan`` passed to :class:`~bluesky_darkframes.DarkFrameProcessor`
+* The ``dark_plan`` passed to :class:`~bluesky_darkframes.DarkFramePreprocessor`
   is now expected to accept a ``detector`` argument. Previously the
   ``dark_plan`` referred to a specific detector instance in its body, as in:
 
@@ -41,7 +41,7 @@ Changed
           dark_plan=dark_plan, detector=some_detector)
 
   Now, the ``dark_plan`` can be written to accept a generic ``detector``
-  argument, and  :class:`~bluesky_darkframes.DarkFrameProcessor` will pass
+  argument, and  :class:`~bluesky_darkframes.DarkFramePreprocessor` will pass
   ``some_detector`` in, as in:
 
   .. code:: python
@@ -69,7 +69,7 @@ v0.3.0 (2019-08-15)
 This release fixes a critical off-by-one issue in v0.2.0. All users are
 recommended to upgrade.
 
-* Associate a given :class:`~bluesky_darkframes.DarkFrameProcessor` instance
+* Associate a given :class:`~bluesky_darkframes.DarkFramePreprocessor` instance
   with a specific detector. This enables it to *only* intercede when that
   specific detector is triggered and to ignore all other acquisitions.
 * Change the timing of when the conditions for a new dark frame are checked:
