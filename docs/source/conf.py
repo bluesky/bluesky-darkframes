@@ -38,7 +38,7 @@ extensions = [
     'sphinx.ext.intersphinx',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
-    'jupyter_sphinx.execute',
+    'jupyter_sphinx',
     'matplotlib.sphinxext.plot_directive',
     'numpydoc',
     'sphinx_copybutton',
