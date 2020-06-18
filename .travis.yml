@@ -25,7 +25,7 @@ script:
   - coverage report -m  # Generate test coverage report.
   - codecov  # Upload the report to codecov.
   - flake8  # Enforce code style.
-  - make -C docs html  # Build the documentation.
   - set -e
+  - make -C docs html  # Build the documentation.
   - pip install doctr
   - doctr deploy --deploy-repo bluesky/bluesky.github.io --deploy-branch-name master bluesky-darkframes;
