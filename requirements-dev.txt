@@ -15,5 +15,6 @@ ipython
 jupyter-sphinx
 matplotlib
 numpydoc
+scikit-image
 sphinx-copybutton
 sphinx_rtd_theme

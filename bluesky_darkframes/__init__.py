@@ -40,7 +40,10 @@ class SnapshotDevice(Device):
         self._read_configuration = device.read_configuration()
         self._read_attrs = list(self._read)
         self._configuration_attrs = list(self._read_configuration)
-        self._asset_docs_cache = list(device.collect_asset_docs())
+        if hasattr(device, "collect_asset_docs"):
+            self._asset_docs_cache = list(device.collect_asset_docs())
+        else:
+            self._asset_docs_cache = []
         self._assets_collected = False
 
     def __repr__(self):
