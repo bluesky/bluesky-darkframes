@@ -517,7 +517,7 @@ class DarkSubtraction(event_model.DocumentRouter):
 
     def event_page(self, doc):
         if doc["descriptor"] == self.dark_descriptor:
-            (self.dark_frame,) = doc["data"][self.field]
+            self.dark_frame, = np.asarray(doc["data"][self.field])
             self.dark_frame -= self.pedestal
             numpy.clip(self.dark_frame, a_min=0, a_max=None, out=self.dark_frame)
         elif doc["descriptor"] == self.light_descriptor:
