@@ -2,6 +2,18 @@
 Release History
 ===============
 
+v0.5.0 (2021-10-08)
+------------------
+
+Fixed
++++++
+* support detectors not defining method ``collect_asset_docs``
+* resolve jupyter_sphinx deprecation warning
+
+Changed
++++++++
+* add scikit-image to ``requirements-dev.txt`` to resolve a CI error
+
 v0.4.0 (2020-03-18)
 -------------------
 
