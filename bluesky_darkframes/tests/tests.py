@@ -244,8 +244,10 @@ def test_streaming_export(RE, tmp_path, pedestal):
         dark_plan=dark_plan, detector=det, max_age=100)
     RE.preprocessors.append(dark_frame_preprocessor)
 
-    RE(count([det]))
+    uid, = RE(count([det]))
     exported_files = os.listdir(tmp_path)
+    for filename in exported_files:
+        assert filename.startswith(uid)
 
     assert len(exported_files) == 2
 
