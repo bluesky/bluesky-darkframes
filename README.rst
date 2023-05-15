@@ -1,9 +1,10 @@
-===============================
+==================
 Bluesky Darkframes
-===============================
+==================
 
-.. image:: https://img.shields.io/travis/bluesky/bluesky-darkframes.svg
-        :target: https://travis-ci.org/bluesky/bluesky-darkframes
+.. image:: https://github.com/bluesky/bluesky-darkframes/actions/workflows/testing.yml/badge.svg
+   :target: https://github.com/bluesky/bluesky-darkframes/actions/workflows/testing.yml
+
 
 .. image:: https://img.shields.io/pypi/v/bluesky-darkframes.svg
         :target: https://pypi.python.org/pypi/bluesky-darkframes

@@ -1,0 +1,10 @@
+default_context:
+  full_name: "Brookhaven National Lab"
+  email: "dallan@bnl.gov"
+  github_username: "bluesky"
+  project_name: "Bluesky Darkframes"
+  package_dist_name: "bluesky-darkframes"
+  package_dir_name: "bluesky_darkframes"
+  repo_name: "bluesky-darkframes"
+  project_short_description: "Tools for acquiring and subtracting darkframes"
+  minimum_supported_python_version: "3.8"

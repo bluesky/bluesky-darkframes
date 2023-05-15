@@ -13,3 +13,4 @@ Bluesky Darkframes Documentation
    usage
    reference
    release-history
+   min_versions
