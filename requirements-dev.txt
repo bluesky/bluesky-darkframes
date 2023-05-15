@@ -1,20 +1,26 @@
 # These are required for developing the package (running the tests, building
 # the documentation) but not necessarily required for _using_ it.
-bluesky >=1.6.0rc1  # for compat with jupyter-sphinx (tornado)
+black
 codecov
 coverage
-databroker
 flake8
-ophyd
+isort
+nbstripout
+pre-commit
+pre-commit-hooks
 pytest
-scipy
 sphinx
-suitcase-tiff
+twine
 # These are dependencies of various sphinx extensions for documentation.
 ipython
 jupyter-sphinx
 matplotlib
 numpydoc
-scikit-image
 sphinx-copybutton
 sphinx_rtd_theme
+# Various dependencies.
+bluesky
+databroker
+ophyd
+scipy
+suitcase-tiff

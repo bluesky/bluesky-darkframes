@@ -1,43 +1,44 @@
-import time
 import os
+import time
 
 import bluesky.plan_stubs as bps
-import bluesky_darkframes
-import bluesky_darkframes.sim
+import pytest
 from bluesky.plans import count
 from event_model import RunRouter
 from ophyd.sim import NumpySeqHandler
-import pytest
 from suitcase.tiff_series import Serializer
 
+import bluesky_darkframes
+import bluesky_darkframes.sim
 
 # This is some simulated hardware for demo purposes.
-det = bluesky_darkframes.sim.DiffractionDetector(name='det')
+det = bluesky_darkframes.sim.DiffractionDetector(name="det")
 det.exposure_time.put(0.01)
-shutter = bluesky_darkframes.sim.Shutter(name='shutter', value='open')
+shutter = bluesky_darkframes.sim.Shutter(name="shutter", value="open")
 
 
 def dark_plan(detector):
     yield from bps.unstage(detector)
-    yield from bps.mv(shutter, 'closed')
+    yield from bps.mv(shutter, "closed")
     yield from bps.stage(detector)
-    yield from bps.trigger(detector, group='bluesky-darkframes-trigger')
-    yield from bps.wait('darkframe-trigger')
+    yield from bps.trigger(detector, group="bluesky-darkframes-trigger")
+    yield from bps.wait("darkframe-trigger")
     snapshot = bluesky_darkframes.SnapshotDevice(detector)
     yield from bps.unstage(detector)
-    yield from bps.mv(shutter, 'open')
+    yield from bps.mv(shutter, "open")
     yield from bps.stage(detector)
     return snapshot
 
 
 def test_one_dark_event_emitted(RE):
     dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-        dark_plan=dark_plan, detector=det, max_age=3)
+        dark_plan=dark_plan, detector=det, max_age=3
+    )
     RE.preprocessors.append(dark_frame_preprocessor)
 
     def verify_one_dark_frame(name, doc):
-        if name == 'stop':
-            assert doc['num_events']['dark'] == 1
+        if name == "stop":
+            assert doc["num_events"]["dark"] == 1
 
     RE(count([det]), verify_one_dark_frame)
     RE(count([det], 3), verify_one_dark_frame)
@@ -45,25 +46,27 @@ def test_one_dark_event_emitted(RE):
 
 def test_disable(RE):
     dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-        dark_plan=dark_plan, detector=det, max_age=3)
+        dark_plan=dark_plan, detector=det, max_age=3
+    )
     RE.preprocessors.append(dark_frame_preprocessor)
     dark_frame_preprocessor.disable()
 
     def verify_no_dark_stream(name, doc):
-        if name == 'stop':
-            assert 'dark' not in doc['num_events']
+        if name == "stop":
+            assert "dark" not in doc["num_events"]
 
     RE(count([det]), verify_no_dark_stream)
 
 
 def test_mid_scan_dark_frames(RE):
     dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-        dark_plan=dark_plan, detector=det, max_age=0)
+        dark_plan=dark_plan, detector=det, max_age=0
+    )
     RE.preprocessors.append(dark_frame_preprocessor)
 
     def verify_three_dark_frames(name, doc):
-        if name == 'stop':
-            assert doc['num_events']['dark'] == 3
+        if name == "stop":
+            assert doc["num_events"]["dark"] == 3
 
     RE(count([det], 3), verify_three_dark_frames)
 
@@ -73,12 +76,13 @@ def test_max_age(RE):
     Test the a dark frame is reused until it expires, and then re-taken.
     """
     dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-        dark_plan=dark_plan, detector=det, max_age=1)
+        dark_plan=dark_plan, detector=det, max_age=1
+    )
     RE.preprocessors.append(dark_frame_preprocessor)
     # The first executation adds something to the cache.
     RE(count([det]))
     assert len(dark_frame_preprocessor.cache) == 1
-    state, = dark_frame_preprocessor.cache
+    (state,) = dark_frame_preprocessor.cache
     # A second execution reuses the cache entry, adds nothing.
     RE(count([det]))
     assert len(dark_frame_preprocessor.cache) == 1
@@ -96,8 +100,8 @@ def test_locked_signals(RE):
     frame is reused.
     """
     dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-        dark_plan=dark_plan, detector=det, max_age=100,
-        locked_signals=[det.exposure_time])
+        dark_plan=dark_plan, detector=det, max_age=100, locked_signals=[det.exposure_time]
+    )
     RE.preprocessors.append(dark_frame_preprocessor)
     RE(count([det]))
     assert len(dark_frame_preprocessor.cache) == 1
@@ -122,8 +126,8 @@ def test_locked_signals_event_output(RE):
     Events containing the reading from A.
     """
     dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-        dark_plan=dark_plan, detector=det, max_age=100,
-        locked_signals=[det.exposure_time])
+        dark_plan=dark_plan, detector=det, max_age=100, locked_signals=[det.exposure_time]
+    )
     RE.preprocessors.append(dark_frame_preprocessor)
 
     def plan():
@@ -143,9 +147,9 @@ def test_locked_signals_event_output(RE):
         yield from bps.close_run()
 
     def verify_event_count(name, doc):
-        if name == 'stop':
-            assert doc['num_events']['dark'] == 3
-            assert doc['num_events']['primary'] == 7
+        if name == "stop":
+            assert doc["num_events"]["dark"] == 3
+            assert doc["num_events"]["primary"] == 7
 
     RE(plan(), verify_event_count)
 
@@ -159,26 +163,25 @@ def test_limit(RE):
     frame is reused.
     """
     dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-        dark_plan=dark_plan, detector=det, max_age=100,
-        locked_signals=[det.exposure_time],
-        limit=1)
+        dark_plan=dark_plan, detector=det, max_age=100, locked_signals=[det.exposure_time], limit=1
+    )
     RE.preprocessors.append(dark_frame_preprocessor)
     RE(count([det]))
     assert len(dark_frame_preprocessor.cache) == 1
-    state, = dark_frame_preprocessor.cache
+    (state,) = dark_frame_preprocessor.cache
     previous_state = state
     RE(bps.mv(det.exposure_time, 0.02))
     # This should take a new dark frame and evict the last one.
     RE(count([det]))
     assert len(dark_frame_preprocessor.cache) == 1
-    state, = dark_frame_preprocessor.cache
+    (state,) = dark_frame_preprocessor.cache
     assert state != previous_state
     previous_state = state
     # This should take a new dark frame and evict the last one.
     RE(bps.mv(det.exposure_time, 0.01))
     RE(count([det]))
     assert len(dark_frame_preprocessor.cache) == 1
-    state, = dark_frame_preprocessor.cache
+    (state,) = dark_frame_preprocessor.cache
     assert state != previous_state
     previous_state = state
 
@@ -195,10 +198,10 @@ def test_non_colliding_uids(RE):
     cache = set()
 
     def check_uniqueness(name, doc):
-        if name == 'datum':
-            key = (name, doc['datum_id'])
+        if name == "datum":
+            key = (name, doc["datum_id"])
         else:
-            key = (name, doc['uid'])
+            key = (name, doc["uid"])
         if key in cache:
             raise LocalException(f"Collision {key}")
         cache.add(key)
@@ -206,7 +209,8 @@ def test_non_colliding_uids(RE):
     RE.subscribe(check_uniqueness)
 
     dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-        dark_plan=dark_plan, detector=det, max_age=100)
+        dark_plan=dark_plan, detector=det, max_age=100
+    )
     RE.preprocessors.append(dark_frame_preprocessor)
 
     RE(count([det]), check_uniqueness)
@@ -214,19 +218,20 @@ def test_non_colliding_uids(RE):
     RE(count([det]), check_uniqueness)
 
 
-@pytest.mark.parametrize('pedestal', [None, 0, 100])
+@pytest.mark.parametrize("pedestal", [None, 0, 100])
 def test_streaming_export(RE, tmp_path, pedestal):
     """
     Test that DarkSubtractor generates files when subscribed to RE.
     """
+
     def factory(name, doc):
         # The problem this is solving is to store documents from this run long
         # enough to cross-reference them (e.g. light frames and dark frames),
         # and then tearing it down when we're done with this run.
         kwargs = {}
         if pedestal is not None:
-            kwargs['pedestal'] = pedestal
-        subtractor = bluesky_darkframes.DarkSubtraction('det_image', **kwargs)
+            kwargs["pedestal"] = pedestal
+        subtractor = bluesky_darkframes.DarkSubtraction("det_image", **kwargs)
         serializer = Serializer(tmp_path)
 
         # And by returning this function below, we are routing all other
@@ -237,14 +242,15 @@ def test_streaming_export(RE, tmp_path, pedestal):
 
         return [subtract_and_serialize], []
 
-    rr = RunRouter([factory], {'NPY_SEQ': NumpySeqHandler})
+    rr = RunRouter([factory], {"NPY_SEQ": NumpySeqHandler})
     RE.subscribe(rr)
 
     dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-        dark_plan=dark_plan, detector=det, max_age=100)
+        dark_plan=dark_plan, detector=det, max_age=100
+    )
     RE.preprocessors.append(dark_frame_preprocessor)
 
-    uid, = RE(count([det]))
+    (uid,) = RE(count([det]))
     exported_files = os.listdir(tmp_path)
     for filename in exported_files:
         assert filename.startswith(uid)
@@ -256,11 +262,12 @@ def test_no_dark_frames(RE, tmp_path):
     """
     Test that a readable error is raised if no 'dark' frame is received.
     """
+
     def factory(name, doc):
         # The problem this is solving is to store documents from this run long
         # enough to cross-reference them (e.g. light frames and dark frames),
         # and then tearing it down when we're done with this run.
-        subtractor = bluesky_darkframes.DarkSubtraction('det_image')
+        subtractor = bluesky_darkframes.DarkSubtraction("det_image")
         serializer = Serializer(tmp_path)
 
         # And by returning this function below, we are routing all other
@@ -271,7 +278,7 @@ def test_no_dark_frames(RE, tmp_path):
 
         return [subtract_and_serialize], []
 
-    rr = RunRouter([factory], {'NPY_SEQ': NumpySeqHandler})
+    rr = RunRouter([factory], {"NPY_SEQ": NumpySeqHandler})
     RE.subscribe(rr)
 
     # We intentionally 'forget' to set up a dark_frame_preprocessor for this
@@ -285,14 +292,14 @@ def test_nested_preprocessors(RE):
     N = 3
     for i in range(N):
         dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-            dark_plan=dark_plan, detector=det, max_age=0,
-            stream_name=f'dark_{i}')
+            dark_plan=dark_plan, detector=det, max_age=0, stream_name=f"dark_{i}"
+        )
         RE.preprocessors.append(dark_frame_preprocessor)
 
     def verify_event_count(name, doc):
-        if name == 'stop':
+        if name == "stop":
             for i in range(N):
-                assert doc['num_events'][f'dark_{i}'] == 3
+                assert doc["num_events"][f"dark_{i}"] == 3
 
     RE(count([det], 3), verify_event_count)
 
@@ -310,12 +317,13 @@ def test_old_dark_plan_signature(RE):
 
     with pytest.warns(UserWarning, match="dark_plan"):
         dark_frame_preprocessor = bluesky_darkframes.DarkFramePreprocessor(
-            dark_plan=old_dark_plan, detector=det, max_age=3)
+            dark_plan=old_dark_plan, detector=det, max_age=3
+        )
     RE.preprocessors.append(dark_frame_preprocessor)
 
     def verify_one_dark_frame(name, doc):
-        if name == 'stop':
-            assert doc['num_events']['dark'] == 1
+        if name == "stop":
+            assert doc["num_events"]["dark"] == 1
 
     RE(count([det]), verify_one_dark_frame)
     RE(count([det], 3), verify_one_dark_frame)
