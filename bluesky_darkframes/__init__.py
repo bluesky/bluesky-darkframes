@@ -7,20 +7,21 @@ import time
 import uuid
 import warnings
 
-import event_model
-from frozendict import frozendict
-import bluesky.preprocessors
 import bluesky.plan_stubs as bps
-from bluesky.utils import short_uid
+import bluesky.preprocessors
+import event_model
 import numpy
+from bluesky.utils import short_uid
+from frozendict import frozendict
 from ophyd import Device
 
 from ._version import get_versions
-__version__ = get_versions()['version']
+
+__version__ = get_versions()["version"]
 del get_versions
 
 
-logger = logging.getLogger('bluesky.darkframes')
+logger = logging.getLogger("bluesky.darkframes")
 
 
 class SnapshotDevice(Device):
@@ -31,6 +32,7 @@ class SnapshotDevice(Device):
     ----------
     device: Device
     """
+
     def __init__(self, device):
         super().__init__(name=device.name, parent=device.parent)
 
@@ -94,35 +96,35 @@ class SnapshotDevice(Device):
         resources = {}  # map old uid to new uid
         new_asset_docs_cache = []
         for name, doc in self._asset_docs_cache:
-            if name == 'resource':
+            if name == "resource":
                 new_uid = str(uuid.uuid4())
-                resources[doc['uid']] = new_uid
+                resources[doc["uid"]] = new_uid
                 new_doc = doc.copy()
-                new_doc['uid'] = new_uid
+                new_doc["uid"] = new_uid
                 new_asset_docs_cache.append((name, new_doc))
-            elif name == 'datum':
+            elif name == "datum":
                 new_doc = doc.copy()
-                old_resource_uid = doc['resource']
+                old_resource_uid = doc["resource"]
                 new_resource_uid = resources[old_resource_uid]
-                new_doc['resource'] = new_resource_uid
+                new_doc["resource"] = new_resource_uid
                 # Some existing code in other libraries looks for the
                 # {resource_uid}/{integer} pattern in Event documents and uses that
                 # to take a fast path. The changes to Datum proposed in
                 # https://github.com/bluesky/event-model/issues/156
                 # would make this less fragile.
-                old_datum_id = doc['datum_id']
+                old_datum_id = doc["datum_id"]
                 if old_datum_id.startswith(f"{old_resource_uid}/"):
-                    _, suffix = old_datum_id.split('/', 1)
+                    _, suffix = old_datum_id.split("/", 1)
                     new_datum_id = f"{new_resource_uid}/{suffix}"
                 else:
                     new_datum_id = str(uuid.uuid4())
-                new_doc['datum_id'] = new_datum_id
+                new_doc["datum_id"] = new_datum_id
                 new_asset_docs_cache.append((name, new_doc))
                 # Update the return value of read() to replace the old datum_id
                 # with the new one.
                 for k, v in list(self._read.items()):
-                    if v['value'] == old_datum_id:
-                        self._read[k]['value'] = new_datum_id
+                    if v["value"] == old_datum_id:
+                        self._read[k]["value"] = new_datum_id
             else:
                 raise BlueskyDarkframesValueError(f"Unexpected name {name}")
         self._asset_docs_cache = new_asset_docs_cache
@@ -145,7 +147,7 @@ class _SnapshotShell:
         return getattr(self.__snapshot, key)
 
 
-GROUP_PREFIX = 'bluesky-darkframes-trigger'
+GROUP_PREFIX = "bluesky-darkframes-trigger"
 
 
 class DarkFramePreprocessor:
@@ -176,15 +178,16 @@ class DarkFramePreprocessor:
     stream_name: string, optional
         Event stream name for dark frames. Default is 'dark'.
     """
-    def __init__(self, *, dark_plan, detector, max_age,
-                 locked_signals=None, limit=None, stream_name='dark'):
+
+    def __init__(self, *, dark_plan, detector, max_age, locked_signals=None, limit=None, stream_name="dark"):
         self._dark_plan = dark_plan
         if not inspect.signature(dark_plan).parameters:
             warnings.warn(
                 f"The dark_plan {dark_plan} is now expected to accept the "
                 f"detector as an argument. A dark_plan that accepts no "
                 f"arguments is still supported, but it may not be supported "
-                f"in future releases.")
+                f"in future releases."
+            )
             self._partialed_dark_plan = dark_plan
         else:
             self._partialed_dark_plan = functools.partial(dark_plan, detector)
@@ -194,8 +197,8 @@ class DarkFramePreprocessor:
         names = [signal.name for signal in locked_signals or ()]
         if len(names) != len(set(names)):
             raise BlueskyDarkframesValueError(
-                f"The signals in locked_signals need to have unique names. "
-                f"The names given were: {names}")
+                f"The signals in locked_signals need to have unique names. The names given were: {names}"
+            )
         self._locked_signals = tuple(locked_signals or ())
         self._limit = limit
         self.stream_name = stream_name
@@ -284,7 +287,8 @@ class DarkFramePreprocessor:
         except KeyError as err:
             raise NoMatchingSnapshot(
                 f"No Snapshot matches the state {state}. Perhaps there *was* "
-                f"match but it has aged out of the cache.") from err
+                f"match but it has aged out of the cache."
+            ) from err
         else:
             self._cache.move_to_end(key, last=False)
             return snapshot
@@ -316,7 +320,7 @@ class DarkFramePreprocessor:
                 # Restructure
                 # {'data_key': {'value': <value>, 'timestamp': <timestamp>}, ...}
                 # into (('data_key', <value>) ...).
-                values_only = tuple((k, v['value']) for k, v in reading.items())
+                values_only = tuple((k, v["value"]) for k, v in reading.items())
                 state[signal.name] = values_only
             try:
                 snapshot = self.get_snapshot(state)
@@ -325,8 +329,7 @@ class DarkFramePreprocessor:
                 # locked_signals were in this state, or the last such reading
                 # we took has aged out of the cache. We have to trigger the
                 # hardware and get a fresh snapshot.
-                logger.info("Taking a new %r reading for state=%r",
-                            self.stream_name, state)
+                logger.info("Taking a new %r reading for state=%r", self.stream_name, state)
                 snapshot = yield from self._partialed_dark_plan()
                 self.add_snapshot(snapshot, state)
             # If the Snapshot is the same as the one we most recently inserted,
@@ -334,8 +337,7 @@ class DarkFramePreprocessor:
             # still holds.
             snapshot_changed = snapshot is not self._current_snapshot.get_snapshot()
             if snapshot_changed or force_read:
-                logger.info("Creating a %r Event for state=%r",
-                            self.stream_name, state)
+                logger.info("Creating a %r Event for state=%r", self.stream_name, state)
                 self._current_snapshot.set_snaphsot(snapshot)
                 # Read the Snapshot. This does not actually trigger hardware,
                 # but it goes through all the bluesky steps to generate new
@@ -347,9 +349,8 @@ class DarkFramePreprocessor:
                 # here, and it will be satisfied.
                 yield from bps.stage(self._current_snapshot)
                 yield from trigger_and_read(
-                    [self._current_snapshot],
-                    name=self.stream_name,
-                    group=short_uid(GROUP_PREFIX))
+                    [self._current_snapshot], name=self.stream_name, group=short_uid(GROUP_PREFIX)
+                )
                 yield from bps.unstage(self._current_snapshot)
             self._latch = False
             if msg is not None:
@@ -362,15 +363,17 @@ class DarkFramePreprocessor:
             # multiple nested DarkFramePreprocessors watching the same detector
             # by applying different dark_plans / recording Events in different
             # streams.)
-            if (msg.command == 'trigger'
-                    and msg.obj is self.detector
-                    and not msg.kwargs['group'].startswith(GROUP_PREFIX)
-                    and not self._latch):
+            if (
+                msg.command == "trigger"
+                and msg.obj is self.detector
+                and not msg.kwargs["group"].startswith(GROUP_PREFIX)
+                and not self._latch
+            ):
                 force_read = self._force_read_before_next_event
                 self._force_read_before_next_event = False
                 self._latch = True  # prevents infinite recursion
                 return insert_dark_frame(force_read=force_read, msg=msg), None
-            elif msg.command == 'open_run':
+            elif msg.command == "open_run":
                 # Make sure we get a new Event because we have just started a
                 # new Run.
                 self._force_read_before_next_event = True
@@ -378,8 +381,7 @@ class DarkFramePreprocessor:
             else:
                 return None, None
 
-        return (yield from bluesky.preprocessors.plan_mutator(
-            plan, maybe_insert_dark_frame))
+        return (yield from bluesky.preprocessors.plan_mutator(plan, maybe_insert_dark_frame))
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {len(self.cache)} snapshots cached>"
@@ -452,11 +454,8 @@ class DarkSubtraction(event_model.DocumentRouter):
 
          Defaults to 100.
     """
-    def __init__(self,
-                 field,
-                 light_stream_name='primary',
-                 dark_stream_name='dark',
-                 pedestal=100):
+
+    def __init__(self, field, light_stream_name="primary", dark_stream_name="dark", pedestal=100):
         self.field = field
         self.light_stream_name = light_stream_name
         self.dark_stream_name = dark_stream_name
@@ -466,51 +465,51 @@ class DarkSubtraction(event_model.DocumentRouter):
         self.pedestal = pedestal
 
     def descriptor(self, doc):
-        if doc['name'] == self.light_stream_name:
-            self.light_descriptor = doc['uid']
+        if doc["name"] == self.light_stream_name:
+            self.light_descriptor = doc["uid"]
             # add flag that we did the background subtraction
             doc = copy.deepcopy(dict(doc))
-            doc['data_keys'][f'{self.field}_is_background_subtracted'] = {
-                'source': 'DarkSubtraction',
-                'dtype': 'number',
-                'shape': [],
-                'precsion': 0,
-                'object_name': f'{self.field}_DarkSubtraction'}
-            doc['configuration'][f'{self.field}_DarkSubtraction'] = {
-                'data': {'pedestal': self.pedestal},
-                'timestamps': {'pedestal': time.time()},
-                'data_keys': {
-                    'pedestal': {
-                        'source': 'DarkSubtraction',
-                        'dtype': 'number',
-                        'shape': [],
-                        'precsion': 0,
-                    }
-                }
+            doc["data_keys"][f"{self.field}_is_background_subtracted"] = {
+                "source": "DarkSubtraction",
+                "dtype": "number",
+                "shape": [],
+                "precsion": 0,
+                "object_name": f"{self.field}_DarkSubtraction",
             }
-            doc['object_keys'][f'{self.field}_DarkSubtraction'] = [
-                f'{self.field}_is_background_subtracted']
+            doc["configuration"][f"{self.field}_DarkSubtraction"] = {
+                "data": {"pedestal": self.pedestal},
+                "timestamps": {"pedestal": time.time()},
+                "data_keys": {
+                    "pedestal": {
+                        "source": "DarkSubtraction",
+                        "dtype": "number",
+                        "shape": [],
+                        "precsion": 0,
+                    }
+                },
+            }
+            doc["object_keys"][f"{self.field}_DarkSubtraction"] = [f"{self.field}_is_background_subtracted"]
 
-        elif doc['name'] == self.dark_stream_name:
-            self.dark_descriptor = doc['uid']
+        elif doc["name"] == self.dark_stream_name:
+            self.dark_descriptor = doc["uid"]
         return doc
 
     def event_page(self, doc):
-        if doc['descriptor'] == self.dark_descriptor:
-            self.dark_frame, = doc['data'][self.field]
+        if doc["descriptor"] == self.dark_descriptor:
+            (self.dark_frame,) = doc["data"][self.field]
             self.dark_frame -= self.pedestal
             numpy.clip(self.dark_frame, a_min=0, a_max=None, out=self.dark_frame)
-        elif doc['descriptor'] == self.light_descriptor:
+        elif doc["descriptor"] == self.light_descriptor:
             if self.dark_frame is None:
                 raise NoDarkFrame(
-                    "DarkSubtraction has not received a 'dark' Event yet, so "
-                    "it has nothing to subtract.")
+                    "DarkSubtraction has not received a 'dark' Event yet, so it has nothing to subtract."
+                )
             doc = copy.deepcopy(dict(doc))
-            light = numpy.asarray(doc['data'][self.field])
+            light = numpy.asarray(doc["data"][self.field])
             subtracted = self.subtract(light, self.dark_frame)
-            doc['data'][self.field] = subtracted
-            doc['data'][f'{self.field}_is_background_subtracted'] = [True]
-            doc['timestamps'][f'{self.field}_is_background_subtracted'] = [time.time()]
+            doc["data"][self.field] = subtracted
+            doc["data"][f"{self.field}_is_background_subtracted"] = [True]
+            doc["timestamps"][f"{self.field}_is_background_subtracted"] = [time.time()]
         return doc
 
     def subtract(self, light, dark):
@@ -536,7 +535,7 @@ class NoMatchingSnapshot(KeyError, BlueskyDarkframesException):
 # Vendored from bluesky.plan_stubs, added `group` parameter
 
 
-def trigger_and_read(devices, name='primary', group=None):
+def trigger_and_read(devices, name="primary", group=None):
     """
     Trigger and read a list of detectors and bundle readings into one Event.
 
@@ -564,10 +563,10 @@ def trigger_and_read(devices, name='primary', group=None):
     def inner_trigger_and_read():
         nonlocal group
         if group is None:
-            group = short_uid('trigger')
+            group = short_uid("trigger")
         no_wait = True
         for obj in devices:
-            if hasattr(obj, 'trigger'):
+            if hasattr(obj, "trigger"):
                 no_wait = False
                 yield from bps.trigger(obj, group=group)
         # Skip 'wait' if none of the devices implemented a trigger method.
@@ -576,11 +575,12 @@ def trigger_and_read(devices, name='primary', group=None):
         yield from bps.create(name)
         ret = {}  # collect and return readings to give plan access to them
         for obj in devices:
-            reading = (yield from bps.read(obj))
+            reading = yield from bps.read(obj)
             if reading is not None:
                 ret.update(reading)
         yield from bps.save()
         return ret
+
     from bluesky.preprocessors import rewindable_wrapper
-    return (yield from rewindable_wrapper(inner_trigger_and_read(),
-                                          rewindable))
+
+    return (yield from rewindable_wrapper(inner_trigger_and_read(), rewindable))
