@@ -378,6 +378,9 @@ class DarkFramePreprocessor:
                 # new Run.
                 self._force_read_before_next_event = True
                 return None, None
+            elif msg.command == "close_run" and msg.kwargs["exit_status"] in ("abort", "halt"):
+                self._latch = False
+                return None, None
             else:
                 return None, None
 
