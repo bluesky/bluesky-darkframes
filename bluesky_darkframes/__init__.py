@@ -143,6 +143,25 @@ class _SnapshotShell:
     def get_snapshot(self):
         return self.__snapshot
 
+    def describe(self):
+        return self.__snapshot.describe()
+
+    def describe_configuration(self):
+        return self.__snapshot.describe_configuration()
+
+    def read(self):
+        return self.__snapshot.read()
+
+    def read_configuration(self):
+        return self.__snapshot.read_configuration()
+
+    def trigger(self):
+        return self.__snapshot.trigger()
+
+    @property
+    def name(self):
+        return self.__snapshot.name
+
     def __getattr__(self, key):
         return getattr(self.__snapshot, key)
 
