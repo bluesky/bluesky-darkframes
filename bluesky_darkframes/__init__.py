@@ -308,6 +308,8 @@ class DarkFramePreprocessor:
         or whether it can use a cached reading.
         """
 
+        self._latch = False
+
         if self._disabled:
             logger.info("%r is disabled, will act as a no-op", self)
             return (yield from plan)
@@ -377,9 +379,6 @@ class DarkFramePreprocessor:
                 # Make sure we get a new Event because we have just started a
                 # new Run.
                 self._force_read_before_next_event = True
-                return None, None
-            elif msg.command == "close_run" and msg.kwargs["exit_status"] in ("abort", "halt"):
-                self._latch = False
                 return None, None
             else:
                 return None, None
