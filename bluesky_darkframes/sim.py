@@ -67,7 +67,12 @@ class DiffractionDetector(Device):
 
         self._path_stem = None
         self._stashed_image_reading = None
-        self._stashed_image_data_key = None
+        self._stashed_image_data_key = {
+            "source": "SIM:image",
+            "shape": [200, 200],
+            "dtype": "array",
+            "external": "FILESTORE",
+        }
 
     def stage(self):
         file_stem = short_uid()
@@ -99,12 +104,6 @@ class DiffractionDetector(Device):
         datum = {"resource": self._resource_uid, "datum_kwargs": dict(index=data_counter), "datum_id": datum_id}
         self._asset_docs_cache.append(("datum", datum))
         self._stashed_image_reading = {"value": datum_id, "timestamp": time.time()}
-        self._stashed_image_data_key = {
-            "source": "SIM:image",
-            "shape": image.shape,
-            "dtype": "array",
-            "external": "FILESTORE",
-        }
         return TimerStatus(self, self.exposure_time.get())
 
     def read(self):
