@@ -36,11 +36,12 @@ This direct solution is best one for some circumstances. However, if you find
 yourself looking at the prospect of rewriting a large number of plans just to
 add this dark frame logic, it may be simpler to use a bluesky *preprocessor*. A
 preprocessor can augment or modify the steps in a plan. The
-:class:`DarkFramePreprocessor` watches for a given detector to be triggered and
-inserts steps in the plan to acquire and/or record a dark frame when needed.
-Depending on how you configure it, it can reuse a given dark frame multiple
-times. Thus, it will not necessarily *acquire* a dark frame for every Run, but
-it will ensure that at least one 'dark' Event is *recorded* in every Run.
+:class:`~bluesky_darkframes.DarkFramePreprocessor` watches for a given detector
+to be triggered and inserts steps in the plan to acquire and/or record a dark
+frame when needed.  Depending on how you configure it, it can reuse a given dark
+frame multiple times. Thus, it will not necessarily *acquire* a dark frame for
+every Run, but it will ensure that at least one 'dark' Event is *recorded* in
+every Run.
 
 The preprocessor can be applied to specific plans, using Python's decorator
 syntax
@@ -91,7 +92,7 @@ We need to know:
 
 To address (1) define a bluesky plan that closes the shutter, takes an
 acquistion, and reopens the shutter. The last two lines in this example use a
-special mechanism, :class:`bluesky_darkframes.SnapshotDevice`, to stash the
+special mechanism, :class:`~bluesky_darkframes.SnapshotDevice`, to stash the
 acquisition where it can potentially be reused. (Later on we'll set the rules
 for whether/how dark frames can be reused.)
 
@@ -235,7 +236,7 @@ original if desired.
    !ls exported_files
 
 To customize the file name and other output options, see
-:class:`suitcase.tiff_series.Serializer`.
+:class:`~suitcase.tiff_series.Serializer`.
 
 Export data during acquisition (streaming)
 ------------------------------------------
