@@ -2,6 +2,21 @@
 Release History
 ===============
 
+v0.6.0 (2023-06-15)
+-------------------
+
+Fixed
++++++
+* clean up on ``RE.abort()`` properly
+* support for read-only arrays from databroker
+* fix versioneer compatibility with Python 3.11
+
+Changed
+++++++++
+* rerender the project's structure with new cookiecutter.
+* improve tests
+
+
 v0.5.0 (2021-10-08)
 -------------------
 
