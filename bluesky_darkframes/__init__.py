@@ -151,7 +151,7 @@ class _SnapshotShell:
 
     def collect_asset_docs(self):
         return self.__snapshot.collect_asset_docs()
-    
+
     def read(self):
         return self.__snapshot.read()
 
