@@ -25,3 +25,4 @@ ophyd
 pandas
 scipy
 suitcase-tiff
+xarray
