@@ -20,7 +20,7 @@ sphinx-copybutton
 sphinx_rtd_theme
 # Various dependencies.
 bluesky
-databroker
+databroker[back-compat]
 ophyd
 pandas
 scipy
