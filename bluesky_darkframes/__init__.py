@@ -159,7 +159,7 @@ class _SnapshotShell:
 
     def collect_asset_docs(self):
         return self.__snapshot.collect_asset_docs()
-    
+
     def stage(self):
         return self.__snapshot.stage()
 
