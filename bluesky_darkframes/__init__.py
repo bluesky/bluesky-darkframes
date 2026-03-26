@@ -137,7 +137,15 @@ class _SnapshotShell:
     def __init__(self):
         self.__snapshot = None
 
-    def set_snaphsot(self, snapshot):
+    @property
+    def read_attrs(self):
+        return self.__snapshot.read_attrs
+
+    @property
+    def configuration_attrs(self):
+        return self.__snapshot.configuration_attrs
+
+    def set_snapshot(self, snapshot):
         self.__snapshot = snapshot
 
     def get_snapshot(self):
@@ -151,6 +159,12 @@ class _SnapshotShell:
 
     def collect_asset_docs(self):
         return self.__snapshot.collect_asset_docs()
+    
+    def stage(self):
+        return self.__snapshot.stage()
+
+    def unstage(self):
+        return self.__snapshot.unstage()
 
     def read(self):
         return self.__snapshot.read()
@@ -362,7 +376,7 @@ class DarkFramePreprocessor:
             snapshot_changed = snapshot is not self._current_snapshot.get_snapshot()
             if snapshot_changed or force_read:
                 logger.info("Creating a %r Event for state=%r", self.stream_name, state)
-                self._current_snapshot.set_snaphsot(snapshot)
+                self._current_snapshot.set_snapshot(snapshot)
                 # Read the Snapshot. This does not actually trigger hardware,
                 # but it goes through all the bluesky steps to generate new
                 # Event.
