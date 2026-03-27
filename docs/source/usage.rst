@@ -126,13 +126,13 @@ This is boilerplate bluesky and databroker setup not specificially related to
 dark-frames.
 
 .. jupyter-execute::
+   :stderr:
 
    from bluesky import RunEngine
    from databroker import Broker
    from ophyd.sim import NumpySeqHandler
 
    db = Broker.named('temp')
-   db.reg.register_handler('NPY_SEQ', NumpySeqHandler)
    RE = RunEngine()
    RE.subscribe(db.insert);
 
@@ -178,6 +178,7 @@ Acquire and Access Data
 Let's take some data.
 
 .. jupyter-execute::
+   :stderr:
 
    from bluesky.plans import count
 
@@ -187,6 +188,7 @@ And now let's access the data and plot the raw "light" frame, the dark frame,
 and the difference between the two.
 
 .. jupyter-execute::
+   :stderr:
 
    import matplotlib.pyplot as plt
 
@@ -212,14 +214,26 @@ First we'll define a convenience function.
 .. jupyter-execute::
 
    from bluesky_darkframes import DarkSubtraction
+   from event_model import Filler, RunRouter
+   from ophyd.sim import NumpySeqHandler
    from suitcase.tiff_series import Serializer
 
    def export_subtracted_tiff_series(header, *args, **kwargs):
-       subtractor = DarkSubtraction('det_image')
-       with Serializer(*args, **kwargs) as serializer:
-           for name, doc in header.documents(fill=True):
+       def factory(name, doc):
+           subtractor = DarkSubtraction('det_image')
+           serializer = Serializer(*args, **kwargs)
+
+           def subtract_and_serialize(name, doc):
                name, doc = subtractor(name, doc)
                serializer(name, doc)
+
+           return [subtract_and_serialize], []
+
+       filler = Filler({'NPY_SEQ': NumpySeqHandler}, inplace=True)
+       rr = RunRouter([factory])
+       for name, doc in header.documents(fill=False):
+           name, doc = filler(name, doc)
+           rr(name, doc)
 
 And now apply it to the data we just took.
 
@@ -247,6 +261,7 @@ Here we use a :class:`event_model.RunRouter`.
 
    from bluesky_darkframes import DarkSubtraction
    from event_model import RunRouter
+   from ophyd.sim import NumpySeqHandler
    from suitcase.tiff_series import Serializer
 
    def factory(name, doc):
@@ -264,7 +279,7 @@ Here we use a :class:`event_model.RunRouter`.
 
        return [subtract_and_serialize], []
 
-   rr = RunRouter([factory], db.reg.handler_reg)
+   rr = RunRouter([factory], handler_registry={'NPY_SEQ': NumpySeqHandler})
    RE.subscribe(rr);
 
 Now take some data.
