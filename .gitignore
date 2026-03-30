@@ -82,5 +82,5 @@ target/
 .ipynb_checkpoints
 
 # Output from executed examples in sphinx
-exported_files/*
-live_exported_files/*
+docs/exported_files/*
+docs/live_exported_files/*
